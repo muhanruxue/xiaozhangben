@@ -1,9 +1,42 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="0" width="512" height="512" rx="112" fill="#6F7FF5"/>
-  <text x="256" y="298" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
-        font-size="210" font-weight="800" fill="#FFFFFF">¥</text>
-  <g stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="13" stroke-linecap="round">
-    <line x1="164" y1="344" x2="348" y2="344"/>
-    <line x1="164" y1="384" x2="296" y2="384"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0" stop-color="#FFE0A0"/>
+      <stop offset="1" stop-color="#F2A03F"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0.28" cy="0.2" r="0.62">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2C2C34"/>
+      <stop offset="1" stop-color="#141418"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 满幅背景：任意形状的桌面图标遮罩（圆 / 方 / 超椭圆）都能完整填充 -->
+  <rect x="0" y="0" width="512" height="512" fill="url(#bg)"/>
+  <rect x="0" y="0" width="512" height="512" fill="url(#shine)"/>
+
+  <!-- 内容整体内缩，保证被圆形遮罩裁切后仍完整可见 -->
+  <g transform="translate(256,256) scale(0.76) translate(-256,-256)">
+    <!-- 耳朵 -->
+    <path d="M138 200 L112 92 L224 154 Z" fill="url(#fur)"/>
+    <path d="M374 200 L400 92 L288 154 Z" fill="url(#fur)"/>
+    <path d="M152 184 L138 126 L202 160 Z" fill="#F7B4C8" opacity="0.75"/>
+    <path d="M360 184 L374 126 L310 160 Z" fill="#F7B4C8" opacity="0.75"/>
+    <!-- 头 -->
+    <ellipse cx="256" cy="282" rx="152" ry="134" fill="url(#fur)"/>
+    <!-- 眼睛 -->
+    <ellipse cx="204" cy="272" rx="32" ry="36" fill="#FFD24A"/>
+    <ellipse cx="308" cy="272" rx="32" ry="36" fill="#FFD24A"/>
+    <ellipse cx="204" cy="276" rx="11" ry="24" fill="#15151A"/>
+    <ellipse cx="308" cy="276" rx="11" ry="24" fill="#15151A"/>
+    <circle cx="197" cy="259" r="6.5" fill="#FFFFFF" opacity="0.92"/>
+    <circle cx="301" cy="259" r="6.5" fill="#FFFFFF" opacity="0.92"/>
+    <!-- 鼻子与嘴 -->
+    <path d="M240 318 h32 l-16 19 Z" fill="#FF8FA3"/>
+    <path d="M256 337 q-15 19 -33 6" stroke="#FF8FA3" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M256 337 q15 19 33 6" stroke="#FF8FA3" stroke-width="8" fill="none" stroke-linecap="round"/>
   </g>
 </svg>

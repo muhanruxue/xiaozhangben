@@ -252,7 +252,7 @@ public class UpdateManager {
             pendingApk = out;
 
             DownloadManager.Request req = new DownloadManager.Request(Uri.parse(info.apkUrl));
-            req.setTitle("小账本 " + info.version);
+            req.setTitle("黑猫记账 " + info.version);
             req.setDescription("下载完成后会自动提示安装");
             req.setMimeType("application/vnd.android.package-archive");
             req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);

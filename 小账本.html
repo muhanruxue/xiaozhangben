@@ -6,7 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
-<title>小账本 · 记账工作台</title>
+<title>黑猫记账 · 记账工作台</title>
+<!-- 内联卡通黑猫 favicon（不产生额外请求，离线也可用） -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23F2A03F'/%3E%3Cpath d='M6.4 12.6 L5 4.6 L12.2 8.2 Z' fill='%231B1B20'/%3E%3Cpath d='M25.6 12.6 L27 4.6 L19.8 8.2 Z' fill='%231B1B20'/%3E%3Cellipse cx='16' cy='18.4' rx='9.4' ry='8.2' fill='%231B1B20'/%3E%3Cellipse cx='12.6' cy='17.6' rx='2.1' ry='2.4' fill='%23FFD24A'/%3E%3Cellipse cx='19.4' cy='17.6' rx='2.1' ry='2.4' fill='%23FFD24A'/%3E%3Cellipse cx='12.6' cy='17.9' rx='.75' ry='1.6' fill='%2315151A'/%3E%3Cellipse cx='19.4' cy='17.9' rx='.75' ry='1.6' fill='%2315151A'/%3E%3Cpath d='M15 20.9h2l-1 1.2Z' fill='%23FF8FA3'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #f5f6f8;
@@ -104,7 +106,8 @@
   .brand { display: flex; align-items: center; gap: 10px; }
   .brand .logo {
     width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
-    background: linear-gradient(135deg, var(--accent), #8a96ff); color: #fff; box-shadow: var(--shadow);
+    /* 与 App 图标一致：暖金底 + 卡通黑猫 */
+    background: linear-gradient(135deg, #FFE0A0, #F2A03F); box-shadow: var(--shadow);
   }
   .brand h1 { font-size: 18px; font-weight: 700; letter-spacing: .3px; }
   .brand .sub { font-size: 11px; color: var(--text-soft); margin-top: -2px; }
@@ -664,10 +667,28 @@
   <div class="topbar">
     <div class="brand">
       <div class="logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <!-- 卡通黑猫头像 -->
+        <svg width="26" height="26" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-label="黑猫记账">
+          <path d="M6.4 12.6 L5 4.6 L12.2 8.2 Z" fill="#1B1B20"/>
+          <path d="M25.6 12.6 L27 4.6 L19.8 8.2 Z" fill="#1B1B20"/>
+          <path d="M7.6 11.6 L6.7 7.2 L11 9.4 Z" fill="#F7B4C8" opacity="0.8"/>
+          <path d="M24.4 11.6 L25.3 7.2 L21 9.4 Z" fill="#F7B4C8" opacity="0.8"/>
+          <ellipse cx="16" cy="18.4" rx="9.4" ry="8.2" fill="#1B1B20"/>
+          <ellipse cx="12.6" cy="17.6" rx="2.1" ry="2.4" fill="#FFD24A"/>
+          <ellipse cx="19.4" cy="17.6" rx="2.1" ry="2.4" fill="#FFD24A"/>
+          <ellipse cx="12.6" cy="17.9" rx="0.75" ry="1.6" fill="#15151A"/>
+          <ellipse cx="19.4" cy="17.9" rx="0.75" ry="1.6" fill="#15151A"/>
+          <path d="M15 20.9 h2 l-1 1.2 Z" fill="#FF8FA3"/>
+          <g stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="0.9" stroke-linecap="round">
+            <path d="M8.4 19 L3.6 17.8"/>
+            <path d="M8.4 20.8 L3.8 21.7"/>
+            <path d="M23.6 19 L28.4 17.8"/>
+            <path d="M23.6 20.8 L28.2 21.7"/>
+          </g>
+        </svg>
       </div>
       <div>
-        <h1>小账本</h1>
+        <h1>黑猫记账</h1>
         <div class="sub">打工人专属记账工作台</div>
       </div>
     </div>
@@ -987,33 +1008,40 @@
       </div>
     </div>
   </div>
-  <div class="card">
-    <div class="card-title">数据与存储</div>
-    <div class="store-box">
-      <div class="store-row">
-        <span class="k">日常数据</span>
-        <span class="v">存于本机 App 私有空间，不上传服务器</span>
-      </div>
-      <div class="store-row">
-        <span class="k">备份位置</span>
-        <span class="v" id="storePath">内部存储 / Download / 小账本备份_日期.json</span>
-      </div>
-      <div class="store-row">
-        <span class="k">当前记录</span>
-        <span class="v" id="storeCount">—</span>
-      </div>
-      <div class="store-row">
-        <span class="k">上次备份</span>
-        <span class="v" id="storeLast">从未备份</span>
-      </div>
+  <!-- 数据与存储：同样默认收起，点「展开」才显示备份/导入等操作 -->
+  <div class="card cfg-card" id="storeCard">
+    <div class="card-title cfg-title" id="storeTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="storeBody">
+      数据与存储
+      <span class="cfg-sum" id="storeSum"></span>
+      <button type="button" class="cfg-toggle" id="storeToggle">展开</button>
     </div>
-    <button class="backup-btn" id="exportBtn">导出 JSON 备份到 Download</button>
-    <button class="backup-btn" id="exportCsvBtn">导出 CSV（Excel 可打开）</button>
-    <button class="backup-btn" id="importBtn">导入恢复（选手机里的备份文件）</button>
-    <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
-    <button class="backup-btn danger" id="clearSampleBtn" style="margin-top:14px;">清空示例数据</button>
-    <button class="backup-btn danger" id="clearAllBtn">清空全部数据</button>
-    <p class="store-tip" id="storeTip">红米 K70 Pro：打开「文件管理 → 手机 → Download」即可看到备份文件。</p>
+    <div class="cfg-body" id="storeBody" hidden>
+      <div class="store-box">
+        <div class="store-row">
+          <span class="k">日常数据</span>
+          <span class="v">存于本机 App 私有空间，不上传服务器</span>
+        </div>
+        <div class="store-row">
+          <span class="k">备份位置</span>
+          <span class="v" id="storePath">内部存储 / Download / 黑猫记账备份_日期.json</span>
+        </div>
+        <div class="store-row">
+          <span class="k">当前记录</span>
+          <span class="v" id="storeCount">—</span>
+        </div>
+        <div class="store-row">
+          <span class="k">上次备份</span>
+          <span class="v" id="storeLast">从未备份</span>
+        </div>
+      </div>
+      <button class="backup-btn" id="exportBtn">导出 JSON 备份到 Download</button>
+      <button class="backup-btn" id="exportCsvBtn">导出 CSV（Excel 可打开）</button>
+      <button class="backup-btn" id="importBtn">导入恢复（选手机里的备份文件）</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+      <button class="backup-btn danger" id="clearSampleBtn" style="margin-top:14px;">清空示例数据</button>
+      <button class="backup-btn danger" id="clearAllBtn">清空全部数据</button>
+      <p class="store-tip" id="storeTip">红米 K70 Pro：打开「文件管理 → 手机 → Download」即可看到备份文件。</p>
+    </div>
   </div>
   <div class="card" id="installCard" style="display:none;">
     <div class="card-title">装到手机桌面</div>
@@ -1862,7 +1890,7 @@
       banner.classList.add("show");
       remindedToday = true;
       if ("Notification" in window && Notification.permission === "granted") {
-        try { new Notification("小账本提醒", { body: "该记账啦～今天还没记录哦" }); } catch (e) {}
+        try { new Notification("黑猫记账提醒", { body: "该记账啦～今天还没记录哦" }); } catch (e) {}
       }
     } else if (recordedToday) {
       banner.classList.remove("show");
@@ -2101,8 +2129,9 @@
     });
     syncRecViewUI();
     // 设置抽屉
-    // 分类与事项配置：默认收起，点标题或「编辑」才展开
+    // 分类与事项配置 / 数据与存储：默认收起，点标题或右侧按钮才展开
     bindCfgCollapse();
+    bindStoreCollapse();
     Array.prototype.forEach.call(document.querySelectorAll("#cfgTypeSeg button"), function (b) {
       b.addEventListener("click", function () { cfgType = b.getAttribute("data-ctype"); renderConfigUI(); });
     });
@@ -2151,30 +2180,24 @@
     bindUpdate();
   }
 
-  // ===== 设置 → 分类与事项配置（可折叠，默认收起）=====
-  var cfgOpen = false;
-  function bindCfgCollapse() {
-    var card = $("cfgCard"), body = $("cfgBody"), title = $("cfgTitle"),
-        btn = $("cfgToggle"), sum = $("cfgSum");
-    if (!card || !body) return;
+  // ===== 设置：可折叠卡片（分类与事项配置 / 数据与存储 共用）=====
+  // o = {card, title, body, btn, sum, closedText, openText, onExpand, summary}
+  function bindCollapse(o) {
+    var card = $(o.card), body = $(o.body), title = $(o.title),
+        btn = $(o.btn), sum = $(o.sum);
+    if (!card || !body) return null;
+    var open = false;
     function apply() {
-      body.hidden = !cfgOpen;
-      card.classList.toggle("open", cfgOpen);
-      if (btn) btn.textContent = cfgOpen ? "收起" : "编辑";
-      if (title) title.setAttribute("aria-expanded", cfgOpen ? "true" : "false");
-      // 收起时给出条目数概览，展开时隐藏，避免信息重复
-      if (sum) {
-        if (cfgOpen) { sum.textContent = ""; }
-        else {
-          var c = loadCats();
-          var nExp = c.expense.length, nInc = c.income.length;
-          sum.textContent = nExp + " 支出分类 · " + nInc + " 收入分类";
-        }
-      }
+      body.hidden = !open;
+      card.classList.toggle("open", open);
+      if (btn) btn.textContent = open ? (o.openText || "收起") : (o.closedText || "编辑");
+      if (title) title.setAttribute("aria-expanded", open ? "true" : "false");
+      // 收起时在标题右侧给一句概览，展开时隐藏，避免信息重复
+      if (sum) sum.textContent = open ? "" : (o.summary ? o.summary() : "");
     }
     function toggle() {
-      cfgOpen = !cfgOpen;
-      if (cfgOpen) renderConfigUI(); // 展开时才渲染，内容始终是最新的
+      open = !open;
+      if (open && o.onExpand) o.onExpand(); // 展开时才渲染/刷新，内容始终最新
       apply();
     }
     if (btn) btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
@@ -2185,6 +2208,42 @@
       });
     }
     apply();
+    return { toggle: toggle, isOpen: function () { return open; }, refresh: apply };
+  }
+  function bindCfgCollapse() {
+    return bindCollapse({
+      card: "cfgCard", title: "cfgTitle", body: "cfgBody", btn: "cfgToggle", sum: "cfgSum",
+      closedText: "编辑", openText: "收起",
+      onExpand: function () { renderConfigUI(); },
+      summary: function () {
+        var c = loadCats();
+        return c.expense.length + " 支出分类 · " + c.income.length + " 收入分类";
+      }
+    });
+  }
+  function bindStoreCollapse() {
+    return bindCollapse({
+      card: "storeCard", title: "storeTitle", body: "storeBody", btn: "storeToggle", sum: "storeSum",
+      closedText: "展开", openText: "收起",
+      summary: storeSummaryText
+    });
+  }
+  // KEY_LAST_EXPORT 存的是毫秒时间戳，需格式化后再展示
+  function storeSummaryText() {
+    var s = state.records.length + " 条记录";
+    var t = parseInt(localStorage.getItem(KEY_LAST_EXPORT) || "0", 10);
+    if (t) {
+      var d = new Date(t);
+      if (!isNaN(d.getTime())) s += " · 上次备份 " + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+    }
+    return s;
+  }
+  // 记录数/上次备份变化后，若卡片处于收起状态，同步刷新标题右侧概览
+  function refreshStoreSummary() {
+    var sum = $("storeSum"), body = $("storeBody");
+    if (!sum) return;
+    if (body && !body.hidden) return; // 展开时不显示概览
+    sum.textContent = storeSummaryText();
   }
 
   // ===== 设置 → 应用更新 =====
@@ -2586,8 +2645,8 @@
   }
   function exportJSON() {
     if (!state.records.length) { showToast("还没有记录可导出"); return; }
-    var data = { records: state.records, reminder: loadReminder(), exportedAt: new Date().toISOString(), app: "小账本" };
-    downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "小账本备份_" + todayStr() + ".json");
+    var data = { records: state.records, reminder: loadReminder(), exportedAt: new Date().toISOString(), app: "黑猫记账" };
+    downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "黑猫记账备份_" + todayStr() + ".json");
     markExported();
     showToast("已导出到 Download 文件夹");
   }
@@ -2606,7 +2665,7 @@
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       }).join(",");
     }).join("\r\n");
-    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "小账本明细_" + todayStr() + ".csv");
+    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "黑猫记账明细_" + todayStr() + ".csv");
     markExported();
     showToast("已导出 CSV 到 Download 文件夹");
   }
@@ -2629,6 +2688,7 @@
         l.textContent = days <= 0 ? "今天（" + stamp + "）" : days + " 天前（" + stamp + "）";
       }
     }
+    refreshStoreSummary(); // 收起状态下同步标题右侧的概览
   }
   // 非「已安装」状态时，提示可以把本页装到桌面
   function renderInstallHint() {

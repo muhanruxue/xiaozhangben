@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-不用 Gradle，直接用 Android SDK 命令行工具把小账本打成 APK。
+不用 Gradle，直接用 Android SDK 命令行工具把黑猫记账打成 APK。
 
 流程：aapt2 compile → aapt2 link → javac → d8 → 打进 dex → zipalign → apksigner 签名
 用法：python3 build_apk.py
@@ -31,8 +31,8 @@ TARGET_SDK = "34"
 # ===== 版本管理 =====
 # 每次发版都要改这里：VERSION_CODE 必须递增（整数），VERSION_NAME 语义化版本。
 # 应用内更新的新旧判断就是用 VERSION_NAME 与 GitHub Release 的 tag（v1.1.0）比较。
-VERSION_NAME = "1.2.0"
-VERSION_CODE = "3"
+VERSION_NAME = "1.3.0"
+VERSION_CODE = "4"
 
 OUT_APK = ROOT / "小账本.apk"
 KS = ROOT / "xiaozhangben.jks"
@@ -52,20 +52,70 @@ ICON_SIZES = {
 }
 
 
+def render_svg_to_png(svg_path, png_path, size):
+    """把 SVG 等比缩放到目标尺寸后截图。
+
+    坑：直接用 file:// 打开 .svg 时，Chrome 按 SVG 的固有尺寸（如 512×512）渲染，
+    不会缩到窗口大小 —— 于是 window-size=48 只截到整图的左上角，图标变成空白。
+    所以先包一层 HTML，用 CSS 让 svg 撑满视口，再截图。
+    """
+    import re
+    svg = pathlib.Path(svg_path).read_text(encoding="utf-8")
+    m = re.search(r"<svg[^>]*>", svg)
+    if m:
+        tag = m.group(0)
+        # 去掉固定宽高（保留 viewBox），改由 CSS 拉伸
+        stripped = re.sub(r'\s(?:width|height)="[^"]*"', "", tag)
+        svg = svg.replace(tag, stripped, 1)
+    wrapper = (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+        "html,body{margin:0;padding:0;background:transparent;overflow:hidden}"
+        "svg{display:block;width:100vw;height:100vh}"
+        "</style></head><body>" + svg + "</body></html>"
+    )
+    # 不用 tempfile：沙箱下 CPython 的临时目录探测会失败
+    work = ROOT / ".iconsrc"
+    # 注意：本机沙箱 shim 的 mkdir 不认 exist_ok=True，目录已存在时会抛 EEXIST
+    if not work.exists():
+        try:
+            work.mkdir()
+        except Exception:
+            pass
+    page = work / ("icon-%d.html" % size)
+    page.write_text(wrapper, encoding="utf-8")
+    png_path = pathlib.Path(png_path)
+    if not png_path.parent.exists():
+        png_path.parent.mkdir()
+    # 统一先渲染成 512 大图，再用系统 sips 等比缩小。
+    # 原因：小窗口（如 96/144）截图偶发产出几乎空白的 PNG，尺寸越小越不稳；
+    # 固定 512 一次渲染再降采样，既稳定又比逐尺寸截图的锐度更一致。
+    SHOT = 512
+    raw = work / ("raw-%d.png" % SHOT)
+    # --virtual-time-budget / --run-all-compositor-stages-before-draw：
+    # 不加的话截图可能抢在 SVG 绘制完成之前，产出几乎空白的 PNG
+    r = subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
+                        "--hide-scrollbars", "--default-background-color=00000000",
+                        "--run-all-compositor-stages-before-draw",
+                        "--virtual-time-budget=2000",
+                        f"--window-size={SHOT},{SHOT}",
+                        f"--screenshot={raw}", f"file://{page}"],
+                       capture_output=True, text=True)
+    if not (r.returncode == 0 and raw.exists() and raw.stat().st_size > 800):
+        return False
+    if size == SHOT:
+        raw.replace(png_path) if not png_path.exists() else shutil.copyfile(raw, png_path)
+        return True
+    r = subprocess.run(["sips", "-z", str(size), str(size), str(raw), "--out", str(png_path)],
+                       capture_output=True, text=True)
+    return r.returncode == 0 and png_path.exists() and png_path.stat().st_size > 200
+
+
 def render_icons():
     """用无头 Chrome 把 SVG 母版渲染成各密度 PNG，写回 android/res/mipmap-*"""
-    import subprocess as sp
     ok = 0
     for d, size in ICON_SIZES.items():
-        dst_dir = PROJ / "res" / d
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        dst = dst_dir / "ic_launcher.png"
-        r = sp.run([CHROME, "--headless=new", "--disable-gpu", "--no-sandbox",
-                    "--hide-scrollbars", "--default-background-color=00000000",
-                    f"--window-size={size},{size}",
-                    f"--screenshot={dst}", f"file://{ICON_MASTER}"],
-                   capture_output=True, text=True)
-        if r.returncode == 0 and dst.exists():
+        dst = PROJ / "res" / d / "ic_launcher.png"
+        if render_svg_to_png(ICON_MASTER, dst, size):
             ok += 1
             print(f"  图标 {d} ({size}px): {dst.stat().st_size} 字节")
         else:

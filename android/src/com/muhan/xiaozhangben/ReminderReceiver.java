@@ -21,7 +21,7 @@ public class ReminderReceiver extends BroadcastReceiver {
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // 点击通知 -> 打开小账本
+        // 点击通知 -> 打开黑猫记账
         Intent open = new Intent(c, MainActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(
@@ -31,7 +31,7 @@ public class ReminderReceiver extends BroadcastReceiver {
         Notification n;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             n = new Notification.Builder(c, CHANNEL_ID)
-                    .setContentTitle("小账本 · 记账提醒")
+                    .setContentTitle("黑猫记账 · 记账提醒")
                     .setContentText("该记账啦～ 今天还没记录哦")
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setContentIntent(pi)
@@ -40,7 +40,7 @@ public class ReminderReceiver extends BroadcastReceiver {
                     .build();
         } else {
             n = new Notification.Builder(c)
-                    .setContentTitle("小账本 · 记账提醒")
+                    .setContentTitle("黑猫记账 · 记账提醒")
                     .setContentText("该记账啦～ 今天还没记录哦")
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setContentIntent(pi)

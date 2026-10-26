@@ -38,7 +38,7 @@ import java.io.OutputStream;
 import java.util.Calendar;
 
 /**
- * 小账本 · 安卓外壳
+ * 黑猫记账 · 安卓外壳
  * - 整个记账应用是一个内置的单文件 HTML，完全离线运行
  * - 数据存 WebView 自己的 LocalStorage（App 私有空间，不联网）
  * - 导出备份通过 saveFile 桥接直接写入手机 Download 目录
@@ -375,7 +375,7 @@ public class MainActivity extends Activity {
                 return super.onKeyDown(keyCode, event);
             }
             lastBackAt = now;
-            Toast.makeText(this, "再按一次退出小账本", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "再按一次退出黑猫记账", Toast.LENGTH_SHORT).show();
             return true;
         }
         return super.onKeyDown(keyCode, event);

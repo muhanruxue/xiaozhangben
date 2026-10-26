@@ -13,6 +13,7 @@
 """
 import base64
 import pathlib
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -20,6 +21,36 @@ SRC = ROOT / "小账本.html"
 APP = ROOT / "k70app"
 OUT = APP / "index.html"
 ICONS = APP / "icons"
+
+CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+ICON_MASTER = ROOT / "android" / "icon.svg"
+ICON_MASKABLE = ROOT / "android" / "icon-maskable.svg"
+# 图标母版 → 各尺寸 PNG（与 APK 共用同一个卡通黑猫母版，保证两端一致）
+ICON_TARGETS = [
+    ("icon-192.png", ICON_MASTER, 192),
+    ("icon-512.png", ICON_MASTER, 512),
+    ("icon-maskable-512.png", ICON_MASKABLE, 512),
+]
+
+
+def render_icons() -> int:
+    """用无头 Chrome 把 SVG 母版渲染成 PWA 所需的 PNG（复用 build_apk 里的等比缩放渲染）"""
+    sys.path.insert(0, str(ROOT))
+    from build_apk import render_svg_to_png
+
+    ok = 0
+    ICONS.mkdir(parents=True, exist_ok=True)
+    for name, svg, size in ICON_TARGETS:
+        if not svg.exists():
+            print("  缺少图标母版:", svg)
+            continue
+        dst = ICONS / name
+        if render_svg_to_png(svg, dst, size):
+            ok += 1
+            print(f"  图标 {name} ({size}px): {dst.stat().st_size} 字节")
+        else:
+            print(f"  图标 {name} 渲染失败")
+    return ok
 
 
 def data_uri(path: pathlib.Path) -> str:
@@ -35,7 +66,7 @@ def build_head_inject() -> str:
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="小账本">
+  <meta name="apple-mobile-web-app-title" content="黑猫记账">
   <link rel="apple-touch-icon" href="{i192}">
   <style>
     /* 独立运行时（已安装到桌面）让出状态栏高度，避免被通知栏/刘海压住 */
@@ -48,8 +79,8 @@ def build_head_inject() -> str:
   (function () {{
     try {{
       var mf = {{
-        name: "小账本 · 记账工作台",
-        short_name: "小账本",
+        name: "黑猫记账 · 记账工作台",
+        short_name: "黑猫记账",
         description: "打工人专属记账工作台：收支记录、日/月/年统计、消费分布、智能总结",
         start_url: location.href,
         scope: location.origin + "/",
@@ -91,10 +122,10 @@ def main() -> int:
     if not SRC.exists():
         print("找不到源文件:", SRC)
         return 1
-    for p in ("icon-192.png", "icon-512.png", "icon-maskable-512.png"):
-        if not (ICONS / p).exists():
-            print("缺少图标:", ICONS / p)
-            return 1
+    # 每次都按母版重新渲染，改了 icon.svg 就能同步到 PWA
+    print("== 渲染 PWA 图标 ==")
+    if render_icons() != len(ICON_TARGETS):
+        return 1
 
     html = SRC.read_text(encoding="utf-8")
     if "apple-mobile-web-app-title" in html:

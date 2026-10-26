@@ -16,3 +16,6 @@ __pycache__/
 # 工作区元数据
 .workbuddy/
 .DS_Store
+
+# 图标渲染临时页
+.iconsrc/

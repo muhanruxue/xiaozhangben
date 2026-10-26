@@ -89,10 +89,10 @@ def main():
     # 3) 创建 release 并上传 APK
     print("== 3/3 创建 Release 并上传 ==")
     if not notes:
-        notes = "小账本 %s\n\n详见提交记录。" % ver
+        notes = "黑猫记账 %s\n\n详见提交记录。" % ver
     sh(["gh", "release", "create", tag, str(asset),
         "--repo", REPO,
-        "--title", "小账本 %s" % ver,
+        "--title", "黑猫记账 %s" % ver,
         "--notes", notes])
 
     print("\n=== 发布完成 ===")
