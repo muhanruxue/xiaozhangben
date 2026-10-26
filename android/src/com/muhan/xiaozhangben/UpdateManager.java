@@ -2,14 +2,10 @@ package com.muhan.xiaozhangben;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -24,6 +20,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -53,13 +50,8 @@ public class UpdateManager {
 
     private final Activity act;
     private final Handler ui = new Handler(Looper.getMainLooper());
-    private long downloadId = -1;
-    private File pendingApk = null;
-    private BroadcastReceiver dlReceiver;
     /** 是否已有一笔下载在进行中：防止重复点击再下一份 */
     private volatile boolean downloading = false;
-    /** 轮询兜底的 token，非 0 表示正在轮询 */
-    private int pollSeq = 0;
 
     public UpdateManager(Activity act) {
         this.act = act;
@@ -277,149 +269,92 @@ public class UpdateManager {
             Toast.makeText(act, "正在下载中，请稍候…", Toast.LENGTH_SHORT).show();
             return;
         }
-        try {
-            // 下载到 App 私有目录，无需存储权限
-            String name = "heimaojizhang-" + info.version + ".apk";
-            File dir = new File(act.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), APK_DIR);
-            if (!dir.exists() && !dir.mkdirs()) throw new Exception("无法创建下载目录");
-            File out = new File(dir, name);
-            if (out.exists()) out.delete();
-            pendingApk = out;
+        downloading = true;
+        Toast.makeText(act, "正在下载安装包…", Toast.LENGTH_SHORT).show();
+        report("{\"status\":\"downloading\"}");
 
-            DownloadManager.Request req = new DownloadManager.Request(Uri.parse(info.apkUrl));
-            req.setTitle("黑猫记账 " + info.version);
-            req.setDescription("下载完成后会自动提示安装");
-            req.setMimeType("application/vnd.android.package-archive");
-            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            req.setDestinationInExternalFilesDir(act, Environment.DIRECTORY_DOWNLOADS, APK_DIR + "/" + name);
-            req.allowScanningByMediaScanner();
-
-            DownloadManager dm = (DownloadManager) act.getSystemService(Context.DOWNLOAD_SERVICE);
-            if (dm == null) throw new Exception("下载服务不可用");
-
-            // 先装监听再入队：这样注册失败也不会留下一笔"没人管"的下载
-            boolean listen = registerDownloadReceiver();
-
-            downloadId = dm.enqueue(req);
-            downloading = true;
-            if (!listen) startPolling(downloadId); // 广播注册失败时降级为轮询
-
-            Toast.makeText(act, "已开始下载，完成后会提示安装", Toast.LENGTH_SHORT).show();
-            report("{\"status\":\"downloading\"}");
-        } catch (Exception e) {
-            Log.w(TAG, "download start failed", e);
-            downloading = false;
-            Toast.makeText(act, "下载失败：" + safeMsg(e), Toast.LENGTH_LONG).show();
-            report("{\"status\":\"error\",\"message\":" + JSONObject.quote(safeMsg(e)) + "}");
-        }
-    }
-
-    /**
-     * 注册下载完成广播。
-     * Android 14（targetSdk 34）起，registerReceiver 必须显式声明 RECEIVER_EXPORTED /
-     * RECEIVER_NOT_EXPORTED，否则抛 SecurityException：
-     *   "One of RECEIVER_EXPORTED or RECEIVER_NOT_EXPORTED should be specified..."
-     * ACTION_DOWNLOAD_COMPLETE 由系统 DownloadManager 发出，所以用 RECEIVER_EXPORTED。
-     *
-     * @return 是否注册成功；失败时调用方改用轮询兜底
-     */
-    private boolean registerDownloadReceiver() {
-        if (dlReceiver != null) return true;
-        BroadcastReceiver r = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context c, Intent intent) {
-                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                if (id != downloadId) return;
-                installDownloaded(id);
-            }
-        };
-        IntentFilter f = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                act.registerReceiver(r, f, Context.RECEIVER_EXPORTED);
-            } else {
-                act.registerReceiver(r, f);
-            }
-            dlReceiver = r;
-            return true;
-        } catch (Exception e) {
-            Log.w(TAG, "registerReceiver failed, fallback to polling", e);
-            return false;
-        }
-    }
-
-    /** 兜底：轮询下载状态（广播注册被系统拒绝时使用） */
-    private void startPolling(final long id) {
-        final int seq = ++pollSeq;
-        ui.postDelayed(new Runnable() {
+        // 自己下载，不走 DownloadManager：
+        // 1) 不需要注册广播（Android 14 上会抛 RECEIVER_EXPORTED 未指定的 SecurityException）
+        // 2) 不需要 DownloadManager 的兼容处理
+        // 3) APK 只有一百多 KB，秒级完成，进度提示反而多余
+        new Thread(new Runnable() {
             @Override
             public void run() {
-                if (seq != pollSeq || !downloading) return;
-                DownloadManager dm = (DownloadManager) act.getSystemService(Context.DOWNLOAD_SERVICE);
-                if (dm == null) { finishDownload(); return; }
-                Cursor c = null;
+                File out = null;
                 try {
-                    c = dm.query(new DownloadManager.Query().setFilterById(id));
-                    if (c != null && c.moveToFirst()) {
-                        int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                        if (st == DownloadManager.STATUS_SUCCESSFUL || st == DownloadManager.STATUS_FAILED) {
-                            installDownloaded(id);
-                            return;
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "poll failed", e);
-                } finally {
-                    if (c != null) c.close();
+                    File dir = updateDir();
+                    out = new File(dir, "heimaojizhang-" + info.version + ".apk");
+                    if (out.exists()) out.delete();
+                    long got = downloadTo(info.apkUrl, out);
+                    if (got <= 0) throw new Exception("下载内容为空");
+                    // 体积差一半以上就认为不完整（GitHub 偶尔返回中间态）
+                    if (info.size > 0 && got < info.size / 2) throw new Exception("文件不完整");
+                    final File f = out;
+                    ui.post(new Runnable() {
+                        @Override public void run() { onDownloadDone(f); }
+                    });
+                } catch (final Exception e) {
+                    if (out != null && out.exists()) out.delete(); // 不留下残缺包
+                    Log.w(TAG, "download failed", e);
+                    ui.post(new Runnable() {
+                        @Override public void run() { onDownloadFail(e); }
+                    });
                 }
-                ui.postDelayed(this, 800);
             }
-        }, 800);
+        }).start();
     }
 
-    /** 收尾：复位下载中标记并停止轮询 */
-    private void finishDownload() {
+    /** 安装包存放目录：优先外部私有目录，取不到时退回内部目录 */
+    private File updateDir() throws Exception {
+        File base = act.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (base == null) base = act.getFilesDir();
+        if (base == null) throw new Exception("存储不可用");
+        File dir = new File(base, APK_DIR);
+        if (!dir.exists() && !dir.mkdirs()) throw new Exception("无法创建下载目录");
+        return dir;
+    }
+
+    private void onDownloadDone(File f) {
         downloading = false;
-        pollSeq++;
-        downloadId = -1;
+        report("{\"status\":\"downloaded\"}");
+        Toast.makeText(act, "下载完成，正在唤起安装", Toast.LENGTH_SHORT).show();
+        installApk(f);
     }
 
-    private void installDownloaded(long id) {
-        // 广播与轮询可能同时到达，只处理第一次
-        if (!downloading) return;
+    private void onDownloadFail(Exception e) {
+        downloading = false;
+        String msg = safeMsg(e);
+        Toast.makeText(act, "下载失败：" + msg + "（也可点弹窗里的「去网页看看」手动下载）",
+                Toast.LENGTH_LONG).show();
+        report("{\"status\":\"error\",\"message\":" + JSONObject.quote(msg) + "}");
+    }
+
+    /** 直接用 HttpURLConnection 把文件抓下来，返回字节数 */
+    static long downloadTo(String urlStr, File out) throws Exception {
+        HttpURLConnection conn = null;
+        InputStream in = null;
+        FileOutputStream fos = null;
         try {
-            DownloadManager dm = (DownloadManager) act.getSystemService(Context.DOWNLOAD_SERVICE);
-            if (dm == null) return;
-            Cursor c = dm.query(new DownloadManager.Query().setFilterById(id));
-            if (c == null) return;
-            try {
-                if (!c.moveToFirst()) return;
-                int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                if (st != DownloadManager.STATUS_SUCCESSFUL) {
-                    Toast.makeText(act, "下载未完成或已失败", Toast.LENGTH_SHORT).show();
-                    report("{\"status\":\"error\",\"message\":\"下载失败\"}");
-                    return;
-                }
-                String uriStr = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
-                File f = pendingApk;
-                if (uriStr != null && uriStr.startsWith("file://")) {
-                    f = new File(Uri.parse(uriStr).getPath());
-                }
-                if (f == null || !f.exists()) {
-                    Toast.makeText(act, "安装包不存在，请重试", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                report("{\"status\":\"downloaded\"}");
-                installApk(f);
-            } finally {
-                c.close();
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "install failed", e);
-            Toast.makeText(act, "安装失败：" + safeMsg(e), Toast.LENGTH_LONG).show();
+            URL u = new URL(urlStr);
+            conn = (HttpURLConnection) u.openConnection();
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(30000);
+            conn.setInstanceFollowRedirects(true);     // GitHub 资源会 302 到 CDN
+            conn.setRequestProperty("User-Agent", "XiaoZhangBen-Android");
+            conn.setRequestProperty("Accept", "application/vnd.android.package-archive");
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) throw new Exception("HTTP " + code);
+            in = conn.getInputStream();
+            fos = new FileOutputStream(out);
+            byte[] buf = new byte[8192];
+            int n;
+            long total = 0;
+            while ((n = in.read(buf)) > 0) { fos.write(buf, 0, n); total += n; }
+            return total;
         } finally {
-            unregister();
-            finishDownload();
+            if (fos != null) { try { fos.close(); } catch (Exception ignored) {} }
+            if (in != null) { try { in.close(); } catch (Exception ignored) {} }
+            if (conn != null) conn.disconnect();
         }
     }
 
@@ -436,17 +371,9 @@ public class UpdateManager {
         }
     }
 
-    private void unregister() {
-        if (dlReceiver != null) {
-            try { act.unregisterReceiver(dlReceiver); } catch (Exception ignored) {}
-            dlReceiver = null;
-        }
-    }
-
     /** 退出时清理，避免泄漏 */
     public void release() {
-        unregister();
-        finishDownload();
+        downloading = false;
         ui.removeCallbacksAndMessages(null);
     }
 
