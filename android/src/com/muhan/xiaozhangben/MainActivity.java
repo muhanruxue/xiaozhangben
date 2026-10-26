@@ -215,6 +215,16 @@ public class MainActivity extends Activity {
                     }
                 });
             }
+            /** 页面更新弹窗里点「安装更新」：下载并唤起系统安装 */
+            @JavascriptInterface
+            public void downloadUpdate() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (updater != null) updater.downloadUpdate();
+                    }
+                });
+            }
             // 页面侧更新提醒设置（开关 / 时间）时调用，原生据此调度系统通知
             @JavascriptInterface
             public void setReminder(final String json) {

@@ -1,9 +1,7 @@
 package com.muhan.xiaozhangben;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -52,6 +50,8 @@ public class UpdateManager {
     private final Handler ui = new Handler(Looper.getMainLooper());
     /** 是否已有一笔下载在进行中：防止重复点击再下一份 */
     private volatile boolean downloading = false;
+    /** 最近一次查到的新版本信息，供页面弹窗点「安装更新」时使用 */
+    private volatile Info lastInfo = null;
 
     public UpdateManager(Activity act) {
         this.act = act;
@@ -172,12 +172,17 @@ public class UpdateManager {
             Toast.makeText(act, "已经是最新版本", Toast.LENGTH_SHORT).show();
             return;
         }
-        // 有新版：回调页面（带上公告正文，页面用富文本卡片展示）+ 弹原生对话框
+        // 有新版：把公告交给页面，由页面用自绘弹窗展示（样式与 App 一致，不再是系统对话框）
+        lastInfo = info;
         String notes = info.notes == null ? "" : info.notes;
         if (notes.length() > 3000) notes = notes.substring(0, 3000);
         report("{\"status\":\"found\",\"version\":" + JSONObject.quote(info.version) +
             ",\"size\":" + info.size + ",\"notes\":" + JSONObject.quote(notes) + "}");
-        showUpdateDialog(info);
+        // 静默检查时给一句轻提示，避免用户完全察觉不到
+        if (silent) {
+            Toast.makeText(act, "发现新版本 " + info.version + "，可在「设置 → 应用更新」查看",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     /** 把结果回传给页面（页面需实现 window.onUpdateResult(json)） */
@@ -191,30 +196,23 @@ public class UpdateManager {
         }
     }
 
-    private void showUpdateDialog(final Info info) {
-        if (act.isFinishing()) return;
-        StringBuilder msg = new StringBuilder();
-        msg.append("当前版本：").append(currentVersion()).append("\n");
-        msg.append("最新版本：").append(info.version);
-        if (info.size > 0) msg.append("\n安装包大小：").append(humanSize(info.size));
-        String plain = mdToPlain(info.notes);
-        if (plain.length() > 0) msg.append("\n\n更新内容\n").append(plain);
-        new AlertDialog.Builder(act)
-            .setTitle("发现新版本")
-            .setMessage(msg.toString())
-            .setPositiveButton("下载更新", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface d, int w) { startDownload(info); }
-            })
-            .setNeutralButton("去网页看看", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface d, int w) {
-                    try { act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(RELEASES_PAGE))); }
-                    catch (Exception e) { Toast.makeText(act, "无法打开浏览器", Toast.LENGTH_SHORT).show(); }
+    /** 页面弹窗里点「安装更新」时调用：下载最近一次查到的新版本并唤起安装 */
+    public void downloadUpdate() {
+        runOnUi(new Runnable() {
+            @Override
+            public void run() {
+                if (lastInfo == null) {
+                    report("{\"status\":\"error\",\"message\":" + JSONObject.quote("未获取到版本信息，请先检查更新") + "}");
+                    return;
                 }
-            })
-            .setNegativeButton("以后再说", null)
-            .show();
+                startDownload(lastInfo);
+            }
+        });
+    }
+
+    private void runOnUi(Runnable r) {
+        if (Looper.myLooper() == Looper.getMainLooper()) r.run();
+        else ui.post(r);
     }
 
     /**

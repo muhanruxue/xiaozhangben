@@ -31,8 +31,8 @@ TARGET_SDK = "34"
 # ===== 版本管理 =====
 # 每次发版都要改这里：VERSION_CODE 必须递增（整数），VERSION_NAME 语义化版本。
 # 应用内更新的新旧判断就是用 VERSION_NAME 与 GitHub Release 的 tag（v1.1.0）比较。
-VERSION_NAME = "1.4.1"
-VERSION_CODE = "6"
+VERSION_NAME = "1.5.0"
+VERSION_CODE = "7"
 
 OUT_APK = ROOT / "小账本.apk"
 KS = ROOT / "xiaozhangben.jks"

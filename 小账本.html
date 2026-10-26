@@ -240,6 +240,68 @@
   .cfg-pickbtn .pick-cur { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cfg-pickbtn svg { flex: none; color: var(--text-soft); }
 
+  /* ===== 更新公告弹窗（页面内自绘，复用 App 主题变量）===== */
+  .upd-mask {
+    display: none; position: fixed; inset: 0; z-index: 70;
+    background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .22s var(--ease);
+  }
+  .upd-mask.show { display: block; opacity: 1; }
+  .upd-modal {
+    position: fixed; inset: 0; z-index: 71; display: grid; place-items: center;
+    padding: 18px; visibility: hidden; pointer-events: none;
+  }
+  .upd-modal.show { visibility: visible; pointer-events: auto; }
+  .upd-modal-inner {
+    width: min(430px, 100%); max-height: min(72vh, 620px); display: flex; flex-direction: column;
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+    transform: translateY(14px) scale(.98); opacity: 0;
+    transition: transform .24s var(--ease), opacity .2s var(--ease);
+  }
+  .upd-modal.show .upd-modal-inner { transform: none; opacity: 1; }
+  .upd-modal-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 14px 16px 10px; border-bottom: 1px solid var(--line);
+  }
+  .upd-modal-title { font-size: 16px; font-weight: 800; }
+  .upd-modal-close {
+    border: none; background: transparent; color: var(--text-soft); cursor: pointer;
+    font-size: 22px; line-height: 1; width: 32px; height: 32px; border-radius: 8px;
+    display: grid; place-items: center; transition: background .15s var(--ease), color .15s var(--ease);
+  }
+  .upd-modal-close:hover { background: var(--card-soft); color: var(--text); }
+  .upd-modal-body { padding: 12px 16px 4px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+  .upd-modal-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .upd-modal-notes {
+    margin-top: 0; padding: 0; background: transparent; max-height: none;
+    font-size: 13px; color: var(--text);
+  }
+  .upd-modal-notes .upd-p, .upd-modal-notes .upd-ul li { color: var(--text-soft); }
+  .upd-modal-notes a { color: var(--accent); }
+  .upd-modal-status {
+    margin-top: 10px; padding: 9px 12px; border-radius: var(--radius-sm);
+    background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 700;
+  }
+  .upd-modal-status.err { background: var(--expense-soft); color: var(--expense); }
+  .upd-modal-foot {
+    display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line); background: var(--bg);
+  }
+  .upd-btn {
+    flex: 1; min-height: 44px; border-radius: var(--radius-sm); cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    transition: background .18s var(--ease), transform .12s var(--ease), opacity .18s var(--ease);
+  }
+  .upd-btn:active { transform: scale(.98); }
+  .upd-btn.ghost { border: 1px solid var(--line); background: transparent; color: var(--text-soft); }
+  .upd-btn.ghost:hover { background: var(--card-soft); color: var(--text); }
+  .upd-btn.primary {
+    border: none; background: var(--accent); color: #fff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
+  }
+  .upd-btn.primary:hover { filter: brightness(1.05); }
+  .upd-btn[disabled] { opacity: .6; cursor: default; transform: none; }
+
   /* 通用底部选择面板（设置里的分类选择等） */
   .pick-list { max-height: 46vh; overflow-y: auto; padding: 6px 12px 6px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .pick-item {
@@ -993,6 +1055,26 @@
   </div>
 </div>
 
+<!-- 更新公告弹窗（页面内自绘，样式与 App 一致；原生 AlertDialog 已弃用） -->
+<div class="upd-mask" id="updMask"></div>
+<div class="upd-modal" id="updModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="updModalTitle">
+  <div class="upd-modal-inner">
+    <div class="upd-modal-head">
+      <div class="upd-modal-title" id="updModalTitle">发现新版本</div>
+      <button type="button" class="upd-modal-close" id="updModalClose" aria-label="关闭">&times;</button>
+    </div>
+    <div class="upd-modal-body">
+      <div class="upd-modal-meta" id="updModalMeta"></div>
+      <div class="upd-notes upd-modal-notes" id="updModalNotes"></div>
+      <div class="upd-modal-status" id="updModalStatus" hidden></div>
+    </div>
+    <div class="upd-modal-foot">
+      <button type="button" class="upd-btn ghost" id="updCancelBtn">取消更新</button>
+      <button type="button" class="upd-btn primary" id="updInstallBtn">安装更新</button>
+    </div>
+  </div>
+</div>
+
 <!-- 通用底部选择面板（设置里的分类选择等） -->
 <div class="tsheet-mask" id="pickMask"></div>
 <div class="tsheet" id="pickSheet" aria-hidden="true">
@@ -1479,6 +1561,7 @@
   }
   // 安卓返回键：优先收起当前打开的浮层（选择面板 / 时间面板 / 日历面板）
   function closeTopSheet() {
+    if (updModalIsOpen() && !updInstalling) { closeUpdateModal(); return true; }
     if (pickerIsOpen()) { closePicker(); return true; }
     if (timeSheetIsOpen()) { closeTimeSheet(false); return true; }
     if (dateSheetIsOpen()) { closeDateSheet(false); return true; }
@@ -2449,6 +2532,54 @@
     }
     return h;
   }
+  /* ===== 更新公告弹窗（页面内自绘，替代原生 AlertDialog）===== */
+  var updInfo = null;      // 最近一次查到的新版本信息
+  var updInstalling = false;
+
+  function setModalStatus(text, isErr) {
+    var el = $("updModalStatus"); if (!el) return;
+    if (!text) { el.hidden = true; el.textContent = ""; return; }
+    el.textContent = text;
+    el.classList.toggle("err", !!isErr);
+    el.hidden = false;
+  }
+  function openUpdateModal(info) {
+    if (!info) return;
+    updInfo = info;
+    var meta = $("updModalMeta");
+    if (meta) {
+      meta.innerHTML =
+        '<span class="upd-badge">v' + escapeHtml(String(info.version || "").replace(/^v/i, "")) + "</span>" +
+        (info.size ? '<span class="upd-size">' + fmtSize(info.size) + "</span>" : "") +
+        '<span class="upd-size">当前 ' + escapeHtml(currentVerText()) + "</span>";
+    }
+    var notes = $("updModalNotes");
+    if (notes) notes.innerHTML = renderNotesMd(info.notes || "本次为常规更新，建议及时升级。");
+    setModalStatus("");
+    var btn = $("updInstallBtn");
+    if (btn && !updInstalling) { btn.disabled = false; btn.textContent = "安装更新"; }
+    $("updMask").classList.add("show");
+    $("updModal").setAttribute("aria-hidden", "false");
+    var m = $("updModal");
+    void m.offsetHeight;
+    m.classList.add("show");
+  }
+  function closeUpdateModal() {
+    var m = $("updModal"); if (!m) return;
+    m.classList.remove("show");
+    m.setAttribute("aria-hidden", "true");
+    $("updMask").classList.remove("show");
+  }
+  function updModalIsOpen() {
+    var m = $("updModal");
+    return !!(m && m.classList.contains("show"));
+  }
+  function currentVerText() {
+    var v = "";
+    try { if (window.Android && typeof window.Android.getVersionInfo === "function") v = window.Android.getVersionInfo() || ""; } catch (e) {}
+    v = v ? v.split("|")[0] : "";
+    return v || (APP_VERSION.indexOf("__") === 0 ? "Web 版" : APP_VERSION);
+  }
   // 原生层把检查结果回调进来（window.onUpdateResult）
   window.onUpdateResult = function (r) {
     if (!r) return;
@@ -2457,11 +2588,43 @@
     if (r.status === "latest") { setUpdHint("已是最新版本 " + (r.version || "")); setUpdNotes(""); }
     else if (r.status === "found") {
       setUpdHint("发现新版本 " + r.version + (r.size ? "（" + fmtSize(r.size) + "）" : ""));
-      setUpdNotes(notesCardHTML({ version: r.version, size: r.size, body: r.notes || "" }));
+      // 安卓端：公告用页面内弹窗展示，设置卡片只留一行状态，避免重复一大段正文
+      if (inAndroid()) {
+        setUpdNotes('<div class="upd-head"><span class="upd-badge">v' +
+          escapeHtml(String(r.version || "").replace(/^v/i, "")) + "</span>" +
+          (r.size ? '<span class="upd-size">' + fmtSize(r.size) + "</span>" : "") +
+          '<span class="upd-size">当前 ' + escapeHtml(currentVerText()) + "</span></div>" +
+          '<div class="upd-foot"><a href="javascript:void(0)" id="updReopen">查看更新说明</a></div>');
+        var re = $("updReopen");
+        if (re) re.addEventListener("click", function (e) {
+          e.preventDefault();
+          openUpdateModal({ version: r.version, size: r.size, notes: r.notes || "" });
+        });
+        openUpdateModal({ version: r.version, size: r.size, notes: r.notes || "" });
+      } else {
+        setUpdNotes(notesCardHTML({ version: r.version, size: r.size, body: r.notes || "" }));
+      }
     }
-    else if (r.status === "downloading") { setUpdHint("正在后台下载安装包…"); }
-    else if (r.status === "downloaded") { setUpdHint("下载完成，正在唤起安装…"); }
-    else if (r.status === "error") { setUpdHint("检查失败：" + (r.message || "网络异常"), true); }
+    else if (r.status === "downloading") {
+      setUpdHint("正在下载安装包…");
+      updInstalling = true;
+      var b = $("updInstallBtn");
+      if (b) { b.disabled = true; b.textContent = "正在下载…"; }
+      setModalStatus("正在下载安装包，完成后会自动唤起安装…");
+    }
+    else if (r.status === "downloaded") {
+      setUpdHint("下载完成，正在唤起安装…");
+      var b2 = $("updInstallBtn");
+      if (b2) { b2.disabled = true; b2.textContent = "正在安装…"; }
+      setModalStatus("下载完成，正在唤起系统安装界面…");
+    }
+    else if (r.status === "error") {
+      setUpdHint(r.message ? ("出错：" + r.message) : "操作失败", true);
+      updInstalling = false;
+      var b3 = $("updInstallBtn");
+      if (b3) { b3.disabled = false; b3.textContent = "重试更新"; }
+      setModalStatus(r.message ? ("失败：" + r.message) : "操作失败，请稍后重试", true);
+    }
   };
   // 浏览器 / PWA 环境没有原生桥，直接 fetch GitHub API（GitHub 允许跨域）
   function checkUpdateWeb() {
@@ -2519,6 +2682,29 @@
       }
     });
     if (!inAndroid()) setUpdHint("网页版：可查看最新版本，安装需前往发布页");
+    // 公告弹窗：取消 / 安装 / 关闭 / 点遮罩
+    var mCancel = $("updCancelBtn"), mInstall = $("updInstallBtn"),
+        mClose = $("updModalClose"), mMask = $("updMask");
+    if (mCancel) mCancel.addEventListener("click", function () { closeUpdateModal(); });
+    if (mClose) mClose.addEventListener("click", function () { closeUpdateModal(); });
+    if (mMask) mMask.addEventListener("click", function () { if (!updInstalling) closeUpdateModal(); });
+    if (mInstall) mInstall.addEventListener("click", function () {
+      if (!updInfo) { closeUpdateModal(); return; }
+      if (inAndroid()) {
+        updInstalling = true;
+        mInstall.disabled = true; mInstall.textContent = "正在下载…";
+        setModalStatus("正在下载安装包，完成后会自动唤起安装…");
+        try { window.Android.downloadUpdate(); }
+        catch (e) {
+          updInstalling = false;
+          mInstall.disabled = false; mInstall.textContent = "重试更新";
+          setModalStatus("无法启动下载：" + (e.message || "未知错误"), true);
+        }
+      } else {
+        // 网页版没有原生下载能力，直接去发布页手动下载
+        try { window.open(UPD_PAGE, "_blank", "noopener"); } catch (e) { location.href = UPD_PAGE; }
+      }
+    });
   }
   function closeDrawer() {
     if (pendingJump) {
