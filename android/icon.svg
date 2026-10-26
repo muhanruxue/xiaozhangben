@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#6F7FF5"/>
+  <text x="256" y="298" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
+        font-size="210" font-weight="800" fill="#FFFFFF">¥</text>
+  <g stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="13" stroke-linecap="round">
+    <line x1="164" y1="344" x2="348" y2="344"/>
+    <line x1="164" y1="384" x2="296" y2="384"/>
+  </g>
+</svg>

@@ -1,0 +1,18 @@
+# 签名密钥：绝不入库
+*.jks
+*.keystore
+*.p12
+
+# 构建产物
+android/build-*/
+android/assets/
+android/res/mipmap-*/
+*.apk
+
+# Python
+__pycache__/
+*.pyc
+
+# 工作区元数据
+.workbuddy/
+.DS_Store
