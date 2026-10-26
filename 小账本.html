@@ -344,6 +344,21 @@
   .time-pick:hover { border-color: var(--accent); background: var(--accent-soft); }
   .time-pick:active { transform: scale(.995); }
 
+  /* 设置 → 分类与事项配置（默认收起，点「编辑」展开） */
+  .cfg-card .cfg-title { margin-bottom: 0; cursor: pointer; user-select: none; justify-content: flex-start; }
+  .cfg-sum { font-size: 11.5px; font-weight: 500; color: var(--text-soft); flex: 1; text-align: right; }
+  .cfg-toggle {
+    border: 1px solid var(--line); background: var(--card-soft); color: var(--accent);
+    border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+    font-family: inherit; cursor: pointer; flex: none;
+    transition: background .18s var(--ease), transform .12s var(--ease);
+  }
+  .cfg-toggle:hover { background: var(--accent-soft); }
+  .cfg-toggle:active { transform: scale(.95); }
+  .cfg-body { margin-top: 14px; }
+  .cfg-body[hidden] { display: none; }
+  .cfg-card.open .cfg-title { margin-bottom: 14px; }
+
   /* 设置 → 应用更新 */
   .upd-row { display: flex; align-items: center; gap: 10px; }
   .upd-meta { flex: 1; min-width: 0; }
@@ -685,7 +700,7 @@
   <section class="card" id="sec-entry">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-      记账
+      明细
     </div>
 
     <!-- 周期筛选：与「统计分析」完全一致（日/月/年 + 左右切换） -->
@@ -816,7 +831,7 @@
 <!-- 移动端底部 Tab -->
 <nav class="tabbar" id="tabbar">
   <button data-tab="entry" class="active">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>记账
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>明细
   </button>
   <button data-tab="stats">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M8 17V9M13 17V5M18 17v-4"/></svg>统计
@@ -945,47 +960,31 @@
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
   </button>
   <h3>设置与数据</h3>
-  <div class="card">
-    <div class="card-title">应用更新</div>
-    <div class="upd-row">
-      <div class="upd-meta">
-        <div class="upd-ver">当前版本 <b id="appVer">—</b></div>
-        <div class="upd-hint" id="updHint">检查 GitHub Releases 获取最新版本</div>
+  <!-- 分类与事项配置：默认收起，点「编辑」才展开，避免一进设置就看到一大片编辑项 -->
+  <div class="card cfg-card" id="cfgCard">
+    <div class="card-title cfg-title" id="cfgTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="cfgBody">
+      分类与事项配置
+      <span class="cfg-sum" id="cfgSum"></span>
+      <button type="button" class="cfg-toggle" id="cfgToggle">编辑</button>
+    </div>
+    <div class="cfg-body" id="cfgBody" hidden>
+      <div class="cfg-sub">分类（支出 / 收入可分别设置）</div>
+      <div class="cfg-seg" id="cfgTypeSeg">
+        <button type="button" data-ctype="expense" class="active">支出</button>
+        <button type="button" data-ctype="income">收入</button>
       </div>
-      <button type="button" class="mini-btn" id="checkUpdBtn">检查更新</button>
-    </div>
-    <div class="upd-notes" id="updNotes" hidden></div>
-  </div>
-  <div class="card">
-    <div class="card-title">记账提醒</div>
-    <div class="switch-row">
-      <div style="font-size:14px;font-weight:600;">每日提醒</div>
-      <label class="switch"><input type="checkbox" id="remToggle2"><span class="slider"></span></label>
-    </div>
-    <div class="field" style="margin-top:14px;margin-bottom:0;">
-      <label>提醒时间</label>
-      <button type="button" class="time-pick" id="remTimeBtn2"><span id="remTimeLabel2">20:00</span></button>
-    </div>
-    <div class="rem-status" id="remStatus2"></div>
-  </div>
-  <div class="card">
-    <div class="card-title">分类与事项配置</div>
-    <div class="cfg-sub">分类（支出 / 收入可分别设置）</div>
-    <div class="cfg-seg" id="cfgTypeSeg">
-      <button type="button" data-ctype="expense" class="active">支出</button>
-      <button type="button" data-ctype="income">收入</button>
-    </div>
-    <div class="cfg-list" id="cfgCatList"></div>
-    <div class="cfg-add">
-      <input type="text" id="cfgCatInput" placeholder="新增分类名" maxlength="8">
-      <button type="button" class="mini-btn" id="cfgCatAdd">添加</button>
-    </div>
-    <div class="cfg-sub">事项常用项（按分类设置下拉建议）</div>
-    <select class="cfg-sel" id="cfgItemCat"></select>
-    <div class="cfg-list" id="cfgItemList"></div>
-    <div class="cfg-add">
-      <input type="text" id="cfgItemInput" placeholder="新增常用事项" maxlength="20">
-      <button type="button" class="mini-btn" id="cfgItemAdd">添加</button>
+      <div class="cfg-list" id="cfgCatList"></div>
+      <div class="cfg-add">
+        <input type="text" id="cfgCatInput" placeholder="新增分类名" maxlength="8">
+        <button type="button" class="mini-btn" id="cfgCatAdd">添加</button>
+      </div>
+      <div class="cfg-sub">事项常用项（按分类设置下拉建议）</div>
+      <select class="cfg-sel" id="cfgItemCat"></select>
+      <div class="cfg-list" id="cfgItemList"></div>
+      <div class="cfg-add">
+        <input type="text" id="cfgItemInput" placeholder="新增常用事项" maxlength="20">
+        <button type="button" class="mini-btn" id="cfgItemAdd">添加</button>
+      </div>
     </div>
   </div>
   <div class="card">
@@ -1023,6 +1022,18 @@
       之后就能像 App 一样全屏使用，桌面会有独立图标。
     </p>
     <button class="backup-btn" id="installDoneBtn">知道了，不再提示</button>
+  </div>
+  <!-- 应用更新：放在设置最底部（不常用，避免一进设置就占首屏） -->
+  <div class="card">
+    <div class="card-title">应用更新</div>
+    <div class="upd-row">
+      <div class="upd-meta">
+        <div class="upd-ver">当前版本 <b id="appVer">—</b></div>
+        <div class="upd-hint" id="updHint">检查 GitHub Releases 获取最新版本</div>
+      </div>
+      <button type="button" class="mini-btn" id="checkUpdBtn">检查更新</button>
+    </div>
+    <div class="upd-notes" id="updNotes" hidden></div>
   </div>
 </aside>
 
@@ -1819,13 +1830,10 @@
   }
   function renderReminderUI() {
     var r = loadReminder();
-    $("remToggle").checked = r.enabled;
-    $("remToggle2").checked = r.enabled;
+    var t1 = $("remToggle"); if (t1) t1.checked = r.enabled;
     var rl = $("remTimeLabel"); if (rl) rl.textContent = r.time;
-    var rl2 = $("remTimeLabel2"); if (rl2) rl2.textContent = r.time;
     var txt = r.enabled ? ("已开启 · 每天 " + r.time + " 提醒记账") : "未开启提醒";
-    $("remStatus").textContent = txt;
-    $("remStatus2").textContent = txt;
+    var s1 = $("remStatus"); if (s1) s1.textContent = txt;
   }
 
   // 统一刷新入口（单向调度）
@@ -2041,9 +2049,8 @@
       syncReminderToNative(); // 通知原生层调度系统提醒
     }
     $("remToggle").addEventListener("change", onRemChange);
-    $("remToggle2").addEventListener("change", onRemChange);
-    function openRemTime(which) {
-      var label = which === 2 ? $("remTimeLabel2") : $("remTimeLabel");
+    function openRemTime() {
+      var label = $("remTimeLabel");
       openTimeSheet({
         title: "每日提醒时间",
         value: (label ? label.textContent : "20:00") || "20:00",
@@ -2052,8 +2059,7 @@
         }
       });
     }
-    $("remTimeBtn").addEventListener("click", function () { openRemTime(1); });
-    $("remTimeBtn2").addEventListener("click", function () { openRemTime(2); });
+    $("remTimeBtn").addEventListener("click", function () { openRemTime(); });
     // 自定义时间选择器：确定/取消/遮罩关闭 + 滚动与点击选值
     $("tsConfirm").addEventListener("click", function () { closeTimeSheet(true); });
     $("tsCancel").addEventListener("click", function () { closeTimeSheet(false); });
@@ -2095,7 +2101,8 @@
     });
     syncRecViewUI();
     // 设置抽屉
-    // 分类与事项配置
+    // 分类与事项配置：默认收起，点标题或「编辑」才展开
+    bindCfgCollapse();
     Array.prototype.forEach.call(document.querySelectorAll("#cfgTypeSeg button"), function (b) {
       b.addEventListener("click", function () { cfgType = b.getAttribute("data-ctype"); renderConfigUI(); });
     });
@@ -2142,6 +2149,42 @@
       b.addEventListener("click", function () { switchTab(b.getAttribute("data-tab")); });
     });
     bindUpdate();
+  }
+
+  // ===== 设置 → 分类与事项配置（可折叠，默认收起）=====
+  var cfgOpen = false;
+  function bindCfgCollapse() {
+    var card = $("cfgCard"), body = $("cfgBody"), title = $("cfgTitle"),
+        btn = $("cfgToggle"), sum = $("cfgSum");
+    if (!card || !body) return;
+    function apply() {
+      body.hidden = !cfgOpen;
+      card.classList.toggle("open", cfgOpen);
+      if (btn) btn.textContent = cfgOpen ? "收起" : "编辑";
+      if (title) title.setAttribute("aria-expanded", cfgOpen ? "true" : "false");
+      // 收起时给出条目数概览，展开时隐藏，避免信息重复
+      if (sum) {
+        if (cfgOpen) { sum.textContent = ""; }
+        else {
+          var c = loadCats();
+          var nExp = c.expense.length, nInc = c.income.length;
+          sum.textContent = nExp + " 支出分类 · " + nInc + " 收入分类";
+        }
+      }
+    }
+    function toggle() {
+      cfgOpen = !cfgOpen;
+      if (cfgOpen) renderConfigUI(); // 展开时才渲染，内容始终是最新的
+      apply();
+    }
+    if (btn) btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
+    if (title) {
+      title.addEventListener("click", toggle);
+      title.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+    }
+    apply();
   }
 
   // ===== 设置 → 应用更新 =====

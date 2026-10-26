@@ -344,6 +344,20 @@
   .time-pick:hover { border-color: var(--accent); background: var(--accent-soft); }
   .time-pick:active { transform: scale(.995); }
 
+  /* 设置 → 应用更新 */
+  .upd-row { display: flex; align-items: center; gap: 10px; }
+  .upd-meta { flex: 1; min-width: 0; }
+  .upd-ver { font-size: 14px; font-weight: 600; }
+  .upd-ver b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .upd-hint { font-size: 11.5px; color: var(--text-soft); margin-top: 2px; line-height: 1.5; }
+  .upd-notes {
+    margin-top: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    background: var(--card-soft); font-size: 12.5px; color: var(--text-soft);
+    white-space: pre-wrap; line-height: 1.6; max-height: 180px; overflow-y: auto;
+  }
+  .upd-notes b { color: var(--text); }
+  .upd-notes a { color: var(--accent); }
+
   /* 事项输入框内的清空按钮（浮在遮罩之上，保证随时可点） */
   .item-row { position: relative; }
   .item-row input { padding-right: 40px; }
@@ -973,6 +987,17 @@
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
   </button>
   <h3>设置与数据</h3>
+  <div class="card">
+    <div class="card-title">应用更新</div>
+    <div class="upd-row">
+      <div class="upd-meta">
+        <div class="upd-ver">当前版本 <b id="appVer">—</b></div>
+        <div class="upd-hint" id="updHint">检查 GitHub Releases 获取最新版本</div>
+      </div>
+      <button type="button" class="mini-btn" id="checkUpdBtn">检查更新</button>
+    </div>
+    <div class="upd-notes" id="updNotes" hidden></div>
+  </div>
   <div class="card">
     <div class="card-title">记账提醒</div>
     <div class="switch-row">
@@ -2158,6 +2183,106 @@
     Array.prototype.forEach.call(document.querySelectorAll("#tabbar button"), function (b) {
       b.addEventListener("click", function () { switchTab(b.getAttribute("data-tab")); });
     });
+    bindUpdate();
+  }
+
+  // ===== 设置 → 应用更新 =====
+  var UPD_API = "https://api.github.com/repos/muhanruxue/xiaozhangben/releases/latest";
+  var UPD_PAGE = "https://github.com/muhanruxue/xiaozhangben/releases/latest";
+  // 构建 APK 时会把 1.1.0 替换成真实版本号；Web/PWA 环境则显示"Web 版"
+  var APP_VERSION = "1.1.0";
+  var updBusy = false;
+
+  function inAndroid() {
+    return !!(window.Android && typeof window.Android.checkUpdate === "function");
+  }
+  function setUpdHint(text, isErr) {
+    var el = $("updHint"); if (!el) return;
+    el.textContent = text;
+    el.style.color = isErr ? "var(--expense)" : "";
+  }
+  function setUpdNotes(html) {
+    var el = $("updNotes"); if (!el) return;
+    if (!html) { el.hidden = true; el.innerHTML = ""; return; }
+    el.innerHTML = html; el.hidden = false;
+  }
+  function fmtSize(b) {
+    if (!b) return "";
+    if (b < 1024) return b + " B";
+    if (b < 1024 * 1024) return Math.round(b / 1024) + " KB";
+    return (b / 1024 / 1024).toFixed(1) + " MB";
+  }
+  // 原生层把检查结果回调进来（window.onUpdateResult）
+  window.onUpdateResult = function (r) {
+    if (!r) return;
+    updBusy = false;
+    var btn = $("checkUpdBtn"); if (btn) { btn.disabled = false; btn.textContent = "检查更新"; }
+    if (r.status === "latest") { setUpdHint("已是最新版本 " + (r.version || "")); setUpdNotes(""); }
+    else if (r.status === "found") {
+      setUpdHint("发现新版本 " + r.version + (r.size ? "（" + fmtSize(r.size) + "）" : ""));
+      setUpdNotes("已在弹窗中提示，按提示下载安装即可；也可到 " +
+        '<a href="' + UPD_PAGE + '" target="_blank" rel="noopener">发布页</a> 手动下载。');
+    }
+    else if (r.status === "downloading") { setUpdHint("正在后台下载安装包…"); }
+    else if (r.status === "downloaded") { setUpdHint("下载完成，正在唤起安装…"); }
+    else if (r.status === "error") { setUpdHint("检查失败：" + (r.message || "网络异常"), true); }
+  };
+  // 浏览器 / PWA 环境没有原生桥，直接 fetch GitHub API（GitHub 允许跨域）
+  function checkUpdateWeb() {
+    setUpdHint("正在检查…");
+    fetch(UPD_API, { headers: { "Accept": "application/vnd.github+json" }, cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (o) {
+        var latest = String(o.tag_name || "").replace(/^v/i, "");
+        var asset = null;
+        (o.assets || []).forEach(function (a) { if (!asset && /\.apk$/i.test(a.name || "")) asset = a; });
+        var cur = APP_VERSION.indexOf("__") === 0 ? null : APP_VERSION;
+        if (!cur) { setUpdHint("最新版本 " + latest); }
+        else {
+          var cmp = cmpVer(latest, cur);
+          setUpdHint(cmp > 0 ? ("发现新版本 " + latest + "，当前 " + cur) : ("已是最新版本 " + cur));
+        }
+        var notes = (o.body || "").trim();
+        setUpdNotes(
+          (cmpVerSafe(latest, cur) > 0 ? '<b>最新版本 ' + latest + "</b>\n" : "") +
+          (asset ? "安装包：" + fmtSize(asset.size) + "\n" : "") +
+          (notes ? "\n" + notes + "\n\n" : "\n") +
+          '<a href="' + UPD_PAGE + '" target="_blank" rel="noopener">前往发布页下载</a>'
+        );
+      })
+      .catch(function (e) { setUpdHint("检查失败：" + (e.message || "网络异常"), true); })
+      .then(function () { updBusy = false; var b = $("checkUpdBtn"); if (b) { b.disabled = false; b.textContent = "检查更新"; } });
+  }
+  function cmpVerSafe(a, b) { if (!a || !b) return 0; return cmpVer(a, b); }
+  function cmpVer(a, b) {
+    var x = String(a).replace(/^v/i, "").split("."), y = String(b).replace(/^v/i, "").split(".");
+    for (var i = 0; i < 3; i++) {
+      var m = parseInt(x[i] || "0", 10) || 0, n = parseInt(y[i] || "0", 10) || 0;
+      if (m !== n) return m - n;
+    }
+    return 0;
+  }
+  function bindUpdate() {
+    var ver = $("appVer"), btn = $("checkUpdBtn");
+    if (ver) {
+      // 优先用原生返回的真实版本（最权威），否则用构建时注入的版本号
+      var nativeVer = "";
+      try { if (window.Android && typeof window.Android.getVersionInfo === "function") nativeVer = window.Android.getVersionInfo() || ""; } catch (e) {}
+      var shown = nativeVer ? nativeVer.split("|")[0] : (APP_VERSION.indexOf("__") === 0 ? "" : APP_VERSION);
+      ver.textContent = shown || "Web 版";
+    }
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      if (updBusy) return;
+      updBusy = true; btn.disabled = true; btn.textContent = "检查中…";
+      setUpdNotes("");
+      if (inAndroid()) {
+        try { window.Android.checkUpdate(); } catch (e) { updBusy = false; btn.disabled = false; btn.textContent = "检查更新"; setUpdHint("无法调用原生更新", true); }
+      } else {
+        checkUpdateWeb();
+      }
+    });
+    if (!inAndroid()) setUpdHint("网页版：可查看最新版本，安装需前往发布页");
   }
   function closeDrawer() {
     if (pendingJump) {
