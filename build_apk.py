@@ -31,8 +31,8 @@ TARGET_SDK = "34"
 # ===== 版本管理 =====
 # 每次发版都要改这里：VERSION_CODE 必须递增（整数），VERSION_NAME 语义化版本。
 # 应用内更新的新旧判断就是用 VERSION_NAME 与 GitHub Release 的 tag（v1.1.0）比较。
-VERSION_NAME = "1.3.0"
-VERSION_CODE = "4"
+VERSION_NAME = "1.4.0"
+VERSION_CODE = "5"
 
 OUT_APK = ROOT / "小账本.apk"
 KS = ROOT / "xiaozhangben.jks"
@@ -41,7 +41,7 @@ KEY_ALIAS = "xiaozhangben"
 
 # 图标母版放在工程内（android/icon.svg），PNG 用无头浏览器渲染，不依赖 /tmp
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-ICON_MASTER = ROOT / "android" / "icon.svg"
+ICON_MASTER = ROOT / "android" / "icon-master.png"  # 由 make_icon.py 生成
 # 各密度对应的边长（mdpi 48 → xxxhdpi 192）
 ICON_SIZES = {
     "mipmap-mdpi": 48,
@@ -110,16 +110,26 @@ def render_svg_to_png(svg_path, png_path, size):
     return r.returncode == 0 and png_path.exists() and png_path.stat().st_size > 200
 
 
+def resize_png(src, dst, size):
+    """用系统 sips 等比缩放 PNG（自带 alpha，比每次截图更稳、更快）"""
+    dst = pathlib.Path(dst)
+    if not dst.parent.exists():
+        dst.parent.mkdir()
+    r = subprocess.run(["sips", "-z", str(size), str(size), str(src), "--out", str(dst)],
+                       capture_output=True, text=True)
+    return r.returncode == 0 and dst.exists() and dst.stat().st_size > 200
+
+
 def render_icons():
-    """用无头 Chrome 把 SVG 母版渲染成各密度 PNG，写回 android/res/mipmap-*"""
+    """把图标母版缩放成各密度 PNG，写回 android/res/mipmap-*"""
     ok = 0
     for d, size in ICON_SIZES.items():
         dst = PROJ / "res" / d / "ic_launcher.png"
-        if render_svg_to_png(ICON_MASTER, dst, size):
+        if resize_png(ICON_MASTER, dst, size):
             ok += 1
             print(f"  图标 {d} ({size}px): {dst.stat().st_size} 字节")
         else:
-            print(f"  图标 {d} 渲染失败")
+            print(f"  图标 {d} 生成失败")
     return ok == len(ICON_SIZES)
 
 

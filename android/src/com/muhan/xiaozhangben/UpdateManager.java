@@ -56,6 +56,10 @@ public class UpdateManager {
     private long downloadId = -1;
     private File pendingApk = null;
     private BroadcastReceiver dlReceiver;
+    /** 是否已有一笔下载在进行中：防止重复点击再下一份 */
+    private volatile boolean downloading = false;
+    /** 轮询兜底的 token，非 0 表示正在轮询 */
+    private int pollSeq = 0;
 
     public UpdateManager(Activity act) {
         this.act = act;
@@ -176,9 +180,11 @@ public class UpdateManager {
             Toast.makeText(act, "已经是最新版本", Toast.LENGTH_SHORT).show();
             return;
         }
-        // 有新版：回调页面 + 弹原生对话框（页面里手动点也一样弹，体验统一）
+        // 有新版：回调页面（带上公告正文，页面用富文本卡片展示）+ 弹原生对话框
+        String notes = info.notes == null ? "" : info.notes;
+        if (notes.length() > 3000) notes = notes.substring(0, 3000);
         report("{\"status\":\"found\",\"version\":" + JSONObject.quote(info.version) +
-            ",\"size\":" + info.size + "}");
+            ",\"size\":" + info.size + ",\"notes\":" + JSONObject.quote(notes) + "}");
         showUpdateDialog(info);
     }
 
@@ -199,9 +205,8 @@ public class UpdateManager {
         msg.append("当前版本：").append(currentVersion()).append("\n");
         msg.append("最新版本：").append(info.version);
         if (info.size > 0) msg.append("\n安装包大小：").append(humanSize(info.size));
-        if (info.notes != null && info.notes.trim().length() > 0) {
-            msg.append("\n\n更新内容：\n").append(info.notes.trim());
-        }
+        String plain = mdToPlain(info.notes);
+        if (plain.length() > 0) msg.append("\n\n更新内容\n").append(plain);
         new AlertDialog.Builder(act)
             .setTitle("发现新版本")
             .setMessage(msg.toString())
@@ -218,6 +223,31 @@ public class UpdateManager {
             })
             .setNegativeButton("以后再说", null)
             .show();
+    }
+
+    /**
+     * 把 Release 里的 Markdown 公告转成适合原生对话框的纯文本：
+     * 去掉 # 标题符号、** 粗体星号、- 列表符号统一成「·」，压缩多余空行。
+     * 否则弹窗里会显示成「## 本次更新 / ### 1. xxx / **安装提示**」这种原始标记。
+     */
+    static String mdToPlain(String md) {
+        if (md == null) return "";
+        StringBuilder sb = new StringBuilder();
+        String[] lines = md.replace("\r\n", "\n").split("\n");
+        for (String line : lines) {
+            String t = line.trim();
+            if (t.length() == 0) { sb.append("\n"); continue; }
+            if (t.matches("^[-*_]{3,}$")) { sb.append("\n"); continue; }
+            t = t.replaceAll("^#{1,6}\\s*", "");            // 标题
+            t = t.replaceAll("^>\\s?", "");                  // 引用
+            t = t.replaceAll("^[-*+]\\s+", "· ");            // 无序列表
+            t = t.replaceAll("\\*\\*(.+?)\\*\\*", "$1");     // 粗体
+            t = t.replaceAll("`([^`]+)`", "$1");             // 行内代码
+            t = t.replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1"); // 链接取文字
+            sb.append(t).append("\n");
+        }
+        String out = sb.toString().replaceAll("\n{3,}", "\n\n").trim();
+        return out;
     }
 
     static String humanSize(long b) {
@@ -242,9 +272,14 @@ public class UpdateManager {
                 return;
             }
         }
+        // 已有一笔在下载：直接复用，避免重复点击又下一份
+        if (downloading) {
+            Toast.makeText(act, "正在下载中，请稍候…", Toast.LENGTH_SHORT).show();
+            return;
+        }
         try {
             // 下载到 App 私有目录，无需存储权限
-            String name = "xiaozhangben-" + info.version + ".apk";
+            String name = "heimaojizhang-" + info.version + ".apk";
             File dir = new File(act.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), APK_DIR);
             if (!dir.exists() && !dir.mkdirs()) throw new Exception("无法创建下载目录");
             File out = new File(dir, name);
@@ -261,31 +296,97 @@ public class UpdateManager {
 
             DownloadManager dm = (DownloadManager) act.getSystemService(Context.DOWNLOAD_SERVICE);
             if (dm == null) throw new Exception("下载服务不可用");
-            downloadId = dm.enqueue(req);
 
-            // 监听下载完成
-            if (dlReceiver == null) {
-                dlReceiver = new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context c, Intent intent) {
-                        long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                        if (id != downloadId) return;
-                        installDownloaded(id);
-                    }
-                };
-                act.registerReceiver(dlReceiver,
-                    new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-            }
+            // 先装监听再入队：这样注册失败也不会留下一笔"没人管"的下载
+            boolean listen = registerDownloadReceiver();
+
+            downloadId = dm.enqueue(req);
+            downloading = true;
+            if (!listen) startPolling(downloadId); // 广播注册失败时降级为轮询
+
             Toast.makeText(act, "已开始下载，完成后会提示安装", Toast.LENGTH_SHORT).show();
             report("{\"status\":\"downloading\"}");
         } catch (Exception e) {
             Log.w(TAG, "download start failed", e);
+            downloading = false;
             Toast.makeText(act, "下载失败：" + safeMsg(e), Toast.LENGTH_LONG).show();
             report("{\"status\":\"error\",\"message\":" + JSONObject.quote(safeMsg(e)) + "}");
         }
     }
 
+    /**
+     * 注册下载完成广播。
+     * Android 14（targetSdk 34）起，registerReceiver 必须显式声明 RECEIVER_EXPORTED /
+     * RECEIVER_NOT_EXPORTED，否则抛 SecurityException：
+     *   "One of RECEIVER_EXPORTED or RECEIVER_NOT_EXPORTED should be specified..."
+     * ACTION_DOWNLOAD_COMPLETE 由系统 DownloadManager 发出，所以用 RECEIVER_EXPORTED。
+     *
+     * @return 是否注册成功；失败时调用方改用轮询兜底
+     */
+    private boolean registerDownloadReceiver() {
+        if (dlReceiver != null) return true;
+        BroadcastReceiver r = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent intent) {
+                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (id != downloadId) return;
+                installDownloaded(id);
+            }
+        };
+        IntentFilter f = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                act.registerReceiver(r, f, Context.RECEIVER_EXPORTED);
+            } else {
+                act.registerReceiver(r, f);
+            }
+            dlReceiver = r;
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "registerReceiver failed, fallback to polling", e);
+            return false;
+        }
+    }
+
+    /** 兜底：轮询下载状态（广播注册被系统拒绝时使用） */
+    private void startPolling(final long id) {
+        final int seq = ++pollSeq;
+        ui.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (seq != pollSeq || !downloading) return;
+                DownloadManager dm = (DownloadManager) act.getSystemService(Context.DOWNLOAD_SERVICE);
+                if (dm == null) { finishDownload(); return; }
+                Cursor c = null;
+                try {
+                    c = dm.query(new DownloadManager.Query().setFilterById(id));
+                    if (c != null && c.moveToFirst()) {
+                        int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                        if (st == DownloadManager.STATUS_SUCCESSFUL || st == DownloadManager.STATUS_FAILED) {
+                            installDownloaded(id);
+                            return;
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "poll failed", e);
+                } finally {
+                    if (c != null) c.close();
+                }
+                ui.postDelayed(this, 800);
+            }
+        }, 800);
+    }
+
+    /** 收尾：复位下载中标记并停止轮询 */
+    private void finishDownload() {
+        downloading = false;
+        pollSeq++;
+        downloadId = -1;
+    }
+
     private void installDownloaded(long id) {
+        // 广播与轮询可能同时到达，只处理第一次
+        if (!downloading) return;
         try {
             DownloadManager dm = (DownloadManager) act.getSystemService(Context.DOWNLOAD_SERVICE);
             if (dm == null) return;
@@ -318,6 +419,7 @@ public class UpdateManager {
             Toast.makeText(act, "安装失败：" + safeMsg(e), Toast.LENGTH_LONG).show();
         } finally {
             unregister();
+            finishDownload();
         }
     }
 
@@ -344,6 +446,8 @@ public class UpdateManager {
     /** 退出时清理，避免泄漏 */
     public void release() {
         unregister();
+        finishDownload();
+        ui.removeCallbacksAndMessages(null);
     }
 
     // ===== 网络 =====

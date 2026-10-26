@@ -19,3 +19,8 @@ __pycache__/
 
 # 图标渲染临时页
 .iconsrc/
+
+# 图标中间产物
+android/icon-master.png
+android/icon-maskable-master.png
+android/icon-embed.png

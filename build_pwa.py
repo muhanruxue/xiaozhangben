@@ -23,8 +23,8 @@ OUT = APP / "index.html"
 ICONS = APP / "icons"
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-ICON_MASTER = ROOT / "android" / "icon.svg"
-ICON_MASKABLE = ROOT / "android" / "icon-maskable.svg"
+ICON_MASTER = ROOT / "android" / "icon-master.png"
+ICON_MASKABLE = ROOT / "android" / "icon-maskable-master.png"
 # 图标母版 → 各尺寸 PNG（与 APK 共用同一个卡通黑猫母版，保证两端一致）
 ICON_TARGETS = [
     ("icon-192.png", ICON_MASTER, 192),
@@ -36,7 +36,7 @@ ICON_TARGETS = [
 def render_icons() -> int:
     """用无头 Chrome 把 SVG 母版渲染成 PWA 所需的 PNG（复用 build_apk 里的等比缩放渲染）"""
     sys.path.insert(0, str(ROOT))
-    from build_apk import render_svg_to_png
+    from build_apk import resize_png
 
     ok = 0
     ICONS.mkdir(parents=True, exist_ok=True)
@@ -45,7 +45,7 @@ def render_icons() -> int:
             print("  缺少图标母版:", svg)
             continue
         dst = ICONS / name
-        if render_svg_to_png(svg, dst, size):
+        if resize_png(svg, dst, size):
             ok += 1
             print(f"  图标 {name} ({size}px): {dst.stat().st_size} 字节")
         else:
