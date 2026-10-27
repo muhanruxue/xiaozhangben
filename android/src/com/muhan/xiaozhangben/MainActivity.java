@@ -11,13 +11,16 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
+import android.view.View;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.KeyEvent;
+import android.view.WindowManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -27,6 +30,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -35,7 +39,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 
 /**
  * 黑猫记账 · 安卓外壳
@@ -55,8 +61,10 @@ public class MainActivity extends Activity {
     // ===== 每日提醒相关 =====
     private static final String PREFS = "xzb_reminder";
     private static final String KEY_EN = "reminder_enabled";
-    private static final String KEY_TM = "reminder_time";
-    private static final int REMIND_REQ = 0x1234;
+    private static final String KEY_TM = "reminder_time"; // 旧版单时间，迁移用
+    private static final String KEY_LIST = "reminder_list"; // 新版：时间戳数组
+    private static final int REMIND_BASE = 0x1234; // 多个提醒用 0x1234 + index 区分 PendingIntent
+    private static final int REMIND_MAX = 16;      // 最多允许的提醒数（与页面保持一致）
     static final String CHANNEL_ID = "xzb_remind";
 
     private WebView web;
@@ -73,14 +81,8 @@ public class MainActivity extends Activity {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /** 依据 "HH:MM" 排定下一次提醒；若今天该时刻已过，则顺延到明天 */
-    static void scheduleReminder(Context c, String hhmm) {
-        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-        if (am == null) return;
-        Intent i = new Intent(c, ReminderReceiver.class);
-        PendingIntent pi = PendingIntent.getBroadcast(c, REMIND_REQ, i,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
+    /** 依据 "HH:MM" 排定下一次提醒；若今天该时刻已过，则顺延到明天。返回排定的毫秒时间（调试用） */
+    static long scheduleReminderAt(Context c, String hhmm) {
         Calendar cal = Calendar.getInstance();
         int h = 20, m = 0;
         try {
@@ -95,36 +97,83 @@ public class MainActivity extends Activity {
         if (cal.getTimeInMillis() <= System.currentTimeMillis()) {
             cal.add(Calendar.DAY_OF_MONTH, 1); // 今天已过 -> 明天
         }
+        return cal.getTimeInMillis();
+    }
 
+    /** 用精确闹钟排期（适配 Android 12+ 权限降级） */
+    static void setExactAlarm(AlarmManager am, long triggerAt, PendingIntent pi) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12+：优先精确闹钟，无权限时降级为允许闲置时的精确闹钟
             if (am.canScheduleExactAlarms()) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
             } else {
-                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
             }
         } else {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
         }
     }
 
-    static void cancelReminder(Context c) {
+    /** 排定单个提醒（带 index 以区分多个 PendingIntent） */
+    static void scheduleReminder(Context c, String hhmm, int index) {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         Intent i = new Intent(c, ReminderReceiver.class);
-        PendingIntent pi = PendingIntent.getBroadcast(c, REMIND_REQ, i,
+        PendingIntent pi = PendingIntent.getBroadcast(c, REMIND_BASE + index, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        am.cancel(pi);
+        setExactAlarm(am, scheduleReminderAt(c, hhmm), pi);
     }
 
-    /** 读取已保存的提醒设置并排期（开启才排，关闭则取消） */
+    /** 排定一组提醒（多个时间点），会先清掉旧的再排新的 */
+    static void scheduleReminders(Context c, List<String> times) {
+        cancelReminders(c);
+        if (times == null) return;
+        for (int i = 0; i < times.size() && i < REMIND_MAX; i++) {
+            scheduleReminder(c, times.get(i), i);
+        }
+    }
+
+    /** 取消全部提醒闹钟 */
+    static void cancelReminders(Context c) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        Intent i = new Intent(c, ReminderReceiver.class);
+        for (int k = 0; k < REMIND_MAX; k++) {
+            PendingIntent pi = PendingIntent.getBroadcast(c, REMIND_BASE + k, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            am.cancel(pi);
+        }
+    }
+
+    /** 把 JSONArray 转成 String 列表（去空、截断到上限） */
+    static List<String> jsonList(JSONArray arr) {
+        List<String> out = new ArrayList<>();
+        if (arr == null) return out;
+        for (int i = 0; i < arr.length() && i < REMIND_MAX; i++) {
+            String s = arr.optString(i, "");
+            if (s != null && s.length() > 0) out.add(s);
+        }
+        return out;
+    }
+
+    /** 读取已保存的提醒设置并排期（开启且至少有一条才排，否则取消全部） */
     static void scheduleFromPrefs(Context c) {
         SharedPreferences sp = reminderPrefs(c);
-        if (sp.getBoolean(KEY_EN, false)) {
-            scheduleReminder(c, sp.getString(KEY_TM, "20:00"));
-        } else {
-            cancelReminder(c);
+        if (!sp.getBoolean(KEY_EN, false)) { cancelReminders(c); return; }
+        List<String> times = new ArrayList<>();
+        String raw = sp.getString(KEY_LIST, "");
+        if (raw != null && raw.length() > 0) {
+            try {
+                JSONArray a = new JSONArray(raw);
+                times = jsonList(a);
+            } catch (JSONException ignored) {}
         }
+        // 旧版单时间字段迁移：若没有 list 但有 time，补进去
+        if (times.isEmpty()) {
+            String t = sp.getString(KEY_TM, "");
+            if (t != null && t.length() > 0) times.add(t);
+        }
+        if (times.isEmpty()) { cancelReminders(c); return; }
+        scheduleReminders(c, times);
     }
 
     private void createChannel() {
@@ -158,6 +207,10 @@ public class MainActivity extends Activity {
         web = new WebView(this);
         setContentView(web);
         updater = new UpdateManager(this);
+
+        // 沉浸式：让页面内容延伸到状态栏之下，由 HTML 顶栏渐变承接（消除水滴/刘海屏顶部蓝条）。
+        // 状态栏图标深浅由 JS 桥 setStatusBarMode 按当前主题实时设置。
+        applyEdgeToEdge();
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -234,15 +287,23 @@ public class MainActivity extends Activity {
                         try {
                             JSONObject o = new JSONObject(json);
                             boolean en = o.optBoolean("enabled", false);
-                            String time = o.optString("time", "20:00");
+                            JSONArray list = o.optJSONArray("list");
                             reminderPrefs(MainActivity.this).edit()
                                     .putBoolean(KEY_EN, en)
-                                    .putString(KEY_TM, time)
+                                    .putString(KEY_LIST, list == null ? "[]" : list.toString())
                                     .apply();
-                            if (en) scheduleReminder(MainActivity.this, time);
-                            else cancelReminder(MainActivity.this);
+                            if (en && list != null && list.length() > 0) scheduleReminders(MainActivity.this, jsonList(list));
+                            else cancelReminders(MainActivity.this);
                         } catch (JSONException ignored) {}
                     }
+                });
+            }
+            // 按当前主题设置状态栏图标深浅：isDark=true 表示深色主题，用浅色图标
+            @JavascriptInterface
+            public void setStatusBarMode(final boolean isDark) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() { applyStatusBarMode(isDark); }
                 });
             }
         }, "Android");
@@ -350,6 +411,33 @@ public class MainActivity extends Activity {
     void evalJs(String js) {
         if (web != null) {
             try { web.evaluateJavascript(js, null); } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * 沉浸式（edge-to-edge）：让页面内容延伸到状态栏 / 导航栏之下，
+     * 由 HTML 顶栏的渐变 / 背景色承接，从而消除水滴屏、刘海屏顶部那条蓝色/系统色段。
+     * 状态栏图标保持深色（本应用为浅色主题，配深色图标最清晰）。
+     */
+    private void applyEdgeToEdge() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        }
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        // 本应用固定浅色主题，状态栏用深色图标；JS 桥无需再切换
+        applyStatusBarMode(false);
+    }
+
+    /** 设置状态栏图标深浅：isDark=true 表示深色主题 -> 浅色图标 */
+    private void applyStatusBarMode(boolean isDark) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int vis = getWindow().getDecorView().getSystemUiVisibility();
+            if (isDark) vis &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;  // 去掉浅色图标标记 -> 浅色背景上的深色图标被取消，用系统浅色图标
+            else vis |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;          // 浅色背景 + 深色图标
+            getWindow().getDecorView().setSystemUiVisibility(vis);
         }
     }
 

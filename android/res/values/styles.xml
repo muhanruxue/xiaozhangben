@@ -2,9 +2,12 @@
 <resources>
     <!-- 用系统 Material 主题，不引入 appcompat 依赖 -->
     <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">#6F7FF5</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
+        <!-- 状态栏透明：App 走沉浸式（内容延伸到状态栏之下），由页面顶栏渐变承接，
+             不再用固定蓝色，解决水滴/刘海屏顶部露蓝条的问题 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@android:color/white</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <!-- 初始按浅色主题给深色状态栏图标（JS 切到深色主题时会再调桥重置） -->
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

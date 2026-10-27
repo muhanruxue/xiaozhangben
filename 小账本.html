@@ -99,9 +99,13 @@
   /* 顶部栏 */
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 4px 14px; position: sticky; top: 0; z-index: 30;
+    /* 顶部留出安全区，使顶栏内容（Logo/标题）不被状态栏图标（时钟/电量）遮挡，
+       配合安卓 edge-to-edge 沉浸式，消除水滴屏顶部蓝条 */
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 4px 14px;
+    position: sticky; top: 0; z-index: 30;
     background: linear-gradient(var(--bg) 70%, transparent);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   .brand { display: flex; align-items: center; gap: 10px; }
   .brand .logo {
@@ -160,6 +164,30 @@
     margin-left: auto; border: none; background: rgba(255,255,255,.25); color: #fff;
     padding: 6px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; white-space: nowrap;
   }
+
+  /* 多提醒：时间列表（胶囊）+ 添加按钮 */
+  .rem-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .rem-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px solid transparent; border-radius: 999px;
+    padding: 6px 8px 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background .15s var(--ease), border-color .15s var(--ease), transform .15s var(--ease);
+  }
+  .rem-chip:hover { border-color: var(--accent); }
+  .rem-chip:active { transform: scale(.96); }
+  .rem-chip-x {
+    display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,.06); color: var(--accent); font-size: 11px; line-height: 1;
+    transition: background .15s, color .15s;
+  }
+  .rem-chip-x:hover { background: var(--expense); color: #fff; }
+  .rem-add {
+    margin-top: 10px; width: 100%; border: 1px dashed var(--line); background: transparent;
+    color: var(--text-soft); border-radius: var(--radius-sm); padding: 9px; font-size: 13px;
+    cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .rem-add:hover { color: var(--accent); border-color: var(--accent); }
 
   /* 表单 */
   .type-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
@@ -238,7 +266,24 @@
   .cfg-pickbtn:hover { border-color: var(--accent); background: var(--accent-soft); }
   .cfg-pickbtn:active { transform: scale(.995); }
   .cfg-pickbtn .pick-cur { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cfg-pickbtn svg { flex: none; color: var(--text-soft); }
+  .cfg-pickbtn svg { flex: none; color: var(--text-soft); transition: transform .2s var(--ease); }
+  .cfg-pickbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+  /* 内联下拉：菜单与触发框同宽（left:0;right:0 贴合父容器），保证「下拉框宽度与下拉组件一致」 */
+  .cfg-cat-pick { position: relative; width: 100%; }
+  .cfg-cat-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 6;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    box-shadow: var(--shadow); max-height: 220px; overflow-y: auto; padding: 4px;
+  }
+  .cfg-cat-menu .opt {
+    display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+    border-radius: 8px; cursor: pointer; font-size: 14px; transition: background .15s var(--ease);
+  }
+  .cfg-cat-menu .opt:hover { background: var(--card-soft); }
+  .cfg-cat-menu .opt.sel { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .cfg-cat-menu .opt .ico { flex: none; }
+  .cfg-cat-menu .opt .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cfg-cat-menu .opt .ck { color: var(--accent); font-weight: 800; flex: none; }
 
   /* ===== 更新公告弹窗（页面内自绘，复用 App 主题变量）===== */
   .upd-mask {
@@ -635,6 +680,8 @@
   .rec-date:first-child { padding-top: 2px; }
   .rec-del { border: none; background: transparent; color: var(--text-soft); cursor: pointer; padding: 6px; border-radius: 8px; transition: color .2s, background .2s; }
   .rec-del:hover { color: var(--expense); background: var(--expense-soft); }
+  .rec-edit { border: none; background: transparent; color: var(--text-soft); cursor: pointer; padding: 6px; border-radius: 8px; font-size: 15px; line-height: 1; transition: color .2s, background .2s; }
+  .rec-edit:hover { color: var(--accent); background: var(--accent-soft); }
   .empty { text-align: center; color: var(--text-soft); font-size: 13px; padding: 24px 0; }
   /* 记录明细：列表/表格视图切换 */
   .rec-head-actions { display: flex; align-items: center; gap: 8px; }
@@ -938,13 +985,17 @@
     <div class="switch-row">
       <div>
         <div style="font-size:14px;font-weight:600;">每日提醒</div>
-        <div style="font-size:12px;color:var(--text-soft);">到点后打开本页即会提醒你记账</div>
+        <div style="font-size:12px;color:var(--text-soft);">可设多个时间点，到点提醒记账</div>
       </div>
       <label class="switch"><input type="checkbox" id="remToggle"><span class="slider"></span></label>
     </div>
     <div class="field" style="margin-top:14px;">
       <label>提醒时间</label>
-      <button type="button" class="time-pick" id="remTimeBtn"><span id="remTimeLabel">20:00</span></button>
+      <div class="rem-list" id="remList"></div>
+      <button type="button" class="rem-add" id="remAddBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        添加提醒时间
+      </button>
     </div>
     <div class="rem-status" id="remStatus"></div>
   </section>
@@ -973,7 +1024,7 @@
       <button class="icon-btn" id="addCloseBtn" type="button" title="关闭" aria-label="关闭">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
-      <h2>记一笔</h2>
+      <h2 id="addTitle">记一笔</h2>
     </header>
     <div class="entry-body">
       <!-- 日期（置于最上方） + 美化后的独立选择器 -->
@@ -1132,11 +1183,14 @@
         <button type="button" class="mini-btn" id="cfgCatAdd">添加</button>
       </div>
       <div class="cfg-sub">事项常用项（按分类设置下拉建议）</div>
-      <!-- 用自定义底部选择面板代替原生 select：原生下拉在部分 WebView 上会超出页面 -->
-      <button type="button" class="cfg-sel cfg-pickbtn" id="cfgItemCatBtn" aria-haspopup="listbox">
-        <span class="pick-cur" id="cfgItemCatLabel">选择分类</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
+      <!-- 分类事项下拉：内联下拉，菜单宽度与触发框完全一致 -->
+      <div class="cfg-cat-pick" id="cfgCatPick">
+        <button type="button" class="cfg-sel cfg-pickbtn" id="cfgItemCatBtn" aria-haspopup="listbox" aria-expanded="false">
+          <span class="pick-cur" id="cfgItemCatLabel">选择分类</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="cfg-cat-menu" id="cfgCatMenu" role="listbox" hidden></div>
+      </div>
       <div class="cfg-list" id="cfgItemList"></div>
       <div class="cfg-add">
         <input type="text" id="cfgItemInput" placeholder="新增常用事项" maxlength="20">
@@ -1287,7 +1341,9 @@
     pickDay: todayStr(),
     pickMonth: monthStr(),
     pickYear: new Date().getFullYear(),
-    recSearch: ""
+    recSearch: "",
+    editId: null,        // 非空表示正在编辑某条已存在记录（点「保存」会更新而非新增）
+    lastEntryTime: null  // 上一次记一笔所选的时间（HH:MM:SS），供下次打开沿用（见 issue #6）
   };
   var cfgType = "expense";
   // 设置里「事项常用项」当前选中的分类 key，以及当前档位可选的分类列表
@@ -1345,10 +1401,23 @@
      保证安卓 WebView 里样式与手感一致。 */
   var tsState = { hour: 20, min: 0, onConfirm: null };
 
-  function buildTimeCol(box, from, to, cur) {
+  function buildTimeCol(box, from, to, cur, loop) {
+    var n = to - from + 1;
+    box.dataset.loopN = loop ? String(n) : "0";
     var html = '<div class="ts-pad"></div>';
-    for (var i = from; i <= to; i++) {
-      html += '<div class="ts-item' + (i === cur ? " sel" : "") + '" data-v="' + i + '">' + pad(i) + "</div>";
+    if (loop) {
+      // 连续时钟：渲染三份副本，选中项落在中间副本，
+      // 滚动到首尾副本时由 tsRefreshSel 无感跳回中间副本，从而实现 23:00 ↔ 00:00 首尾相连
+      for (var c = 0; c < 3; c++) {
+        for (var i = from; i <= to; i++) {
+          var sel = (c === 1 && i === cur) ? " sel" : "";
+          html += '<div class="ts-item' + sel + '" data-v="' + i + '">' + pad(i) + "</div>";
+        }
+      }
+    } else {
+      for (var k = from; k <= to; k++) {
+        html += '<div class="ts-item' + (k === cur ? " sel" : "") + '" data-v="' + k + '">' + pad(k) + "</div>";
+      }
     }
     html += '<div class="ts-pad"></div>';
     box.innerHTML = html;
@@ -1365,14 +1434,29 @@
   function tsRefreshSel(box) {
     // 依据当前滚动位置判定居中项并高亮
     var center = box.scrollTop + box.clientHeight / 2;
+    var items = box.querySelectorAll(".ts-item");
     var best = null, bestDist = Infinity;
-    Array.prototype.forEach.call(box.querySelectorAll(".ts-item"), function (el) {
+    Array.prototype.forEach.call(items, function (el) {
       var mid = el.offsetTop + el.clientHeight / 2;
       var dist = Math.abs(mid - center);
       if (dist < bestDist) { bestDist = dist; best = el; }
     });
     if (!best) return;
-    Array.prototype.forEach.call(box.querySelectorAll(".ts-item"), function (el) {
+    // 连续时钟：若居中项落在首尾副本，无感跳回中间副本的同值项（data-v 相同），实现 23↔00 无缝衔接
+    var n = parseInt(box.dataset.loopN || "0", 10);
+    if (n) {
+      var idx = -1;
+      Array.prototype.forEach.call(items, function (el, i) { if (el === best) idx = i; });
+      var copy = Math.floor(idx / n);
+      if (copy !== 1) {
+        var target = items[idx + (1 - copy) * n];
+        if (target) {
+          box.scrollTop = target.offsetTop - (box.clientHeight - target.clientHeight) / 2;
+          best = target;
+        }
+      }
+    }
+    Array.prototype.forEach.call(items, function (el) {
       el.classList.toggle("sel", el === best);
     });
     if (box === $("tsHour")) tsState.hour = +best.getAttribute("data-v");
@@ -1396,8 +1480,9 @@
     tsState.min = Math.min(59, Math.max(0, parseInt(parts[1], 10) || 0));
     tsState.onConfirm = opt && opt.onConfirm;
     $("tsTitle").textContent = (opt && opt.title) || "选择时间";
-    buildTimeCol($("tsHour"), 0, 23, tsState.hour);
-    buildTimeCol($("tsMin"), 0, 59, tsState.min);
+    // 小时列启用连续滚动（23:00 ↔ 00:00 首尾相连）；分钟列保持线性 0–59
+    buildTimeCol($("tsHour"), 0, 23, tsState.hour, true);
+    buildTimeCol($("tsMin"), 0, 59, tsState.min, false);
     mask.classList.add("show");
     sheet.setAttribute("aria-hidden", "false");
     void sheet.offsetHeight;             // 强制回流，确保起始 transform 已生效
@@ -1640,6 +1725,44 @@
       row.appendChild(nm); row.appendChild(del); el.appendChild(row);
     });
   }
+  // 设置里「事项所属分类」的内联下拉菜单（宽度与触发框一致）
+  function renderCfgCatMenu() {
+    var menu = $("cfgCatMenu"); if (!menu) return;
+    menu.innerHTML = "";
+    if (!cfgCatOptions.length) {
+      menu.innerHTML = '<div class="opt" style="color:var(--text-soft);cursor:default;">暂无分类，请先添加分类</div>';
+      return;
+    }
+    cfgCatOptions.forEach(function (o) {
+      var d = document.createElement("div");
+      d.className = "opt" + (o.key === cfgItemKey ? " sel" : "");
+      d.setAttribute("role", "option");
+      d.innerHTML = '<span class="ico">' + (o.icon || "📦") + '</span><span class="nm">' + escapeHtml(o.key) + "</span>" +
+        (o.key === cfgItemKey ? '<span class="ck">✓</span>' : "");
+      d.addEventListener("click", function () {
+        cfgItemKey = o.key;
+        syncCfgCatLabel();
+        renderCfgCatMenu();
+        renderItemList(cfgItemKey);
+        closeCfgCatMenu();
+      });
+      menu.appendChild(d);
+    });
+  }
+  function openCfgCatMenu() {
+    var menu = $("cfgCatMenu"), btn = $("cfgItemCatBtn");
+    if (!menu) return;
+    if (!cfgCatOptions.length) { showToast("当前还没有分类，请先添加分类"); return; }
+    renderCfgCatMenu();
+    menu.hidden = false;
+    if (btn) btn.setAttribute("aria-expanded", "true");
+  }
+  function closeCfgCatMenu() {
+    var menu = $("cfgCatMenu"), btn = $("cfgItemCatBtn");
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+  function cfgCatMenuIsOpen() { var m = $("cfgCatMenu"); return !!(m && !m.hidden); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
   // ===== 数据层 =====
@@ -1653,8 +1776,29 @@
     try { localStorage.setItem(KEY_RECORDS, JSON.stringify(state.records)); } catch (e) {}
   }
   function loadReminder() {
-    try { return JSON.parse(localStorage.getItem(KEY_REMINDER)) || { enabled: false, time: "20:00" }; }
-    catch (e) { return { enabled: false, time: "20:00" }; }
+    try {
+      var r = JSON.parse(localStorage.getItem(KEY_REMINDER));
+      if (r && typeof r === "object") {
+        // 兼容旧版单时间字段：迁移为 list 数组
+        if (!Array.isArray(r.list)) {
+          r.list = (r.time && typeof r.time === "string") ? [r.time] : [];
+        }
+        if (typeof r.enabled !== "boolean") r.enabled = false;
+        return r;
+      }
+    } catch (e) {}
+    return { enabled: false, list: [] };
+  }
+  // 去重 + 升序，保证提醒时间有序且不重复
+  function normRemList(list) {
+    var seen = {}, out = [];
+    (list || []).forEach(function (t) {
+      if (typeof t === "string" && /^([01]?\d|2[0-3]):[0-5]\d$/.test(t) && !seen[t]) {
+        seen[t] = 1; out.push(t);
+      }
+    });
+    out.sort();
+    return out;
   }
   function saveReminder(r) { localStorage.setItem(KEY_REMINDER, JSON.stringify(r)); }
   // 把提醒设置同步给安卓原生层（App 据此调度系统级通知，即使关闭 App 到点也会提醒）
@@ -2059,9 +2203,62 @@
   function renderReminderUI() {
     var r = loadReminder();
     var t1 = $("remToggle"); if (t1) t1.checked = r.enabled;
-    var rl = $("remTimeLabel"); if (rl) rl.textContent = r.time;
-    var txt = r.enabled ? ("已开启 · 每天 " + r.time + " 提醒记账") : "未开启提醒";
+    var list = normRemList(r.list);
+    var box = $("remList");
+    if (box) {
+      box.innerHTML = "";
+      list.forEach(function (t, i) {
+        var chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "rem-chip";
+        chip.setAttribute("data-idx", i);
+        chip.innerHTML = '<span class="rem-chip-t">' + t + "</span>";
+        var x = document.createElement("span");
+        x.className = "rem-chip-x";
+        x.textContent = "✕";
+        x.setAttribute("data-x", i);
+        x.title = "删除该提醒";
+        chip.appendChild(x);
+        box.appendChild(chip);
+      });
+      Array.prototype.forEach.call(box.querySelectorAll(".rem-chip"), function (chip) {
+        chip.addEventListener("click", function (e) {
+          var i = +chip.getAttribute("data-idx");
+          if (e.target.classList.contains("rem-chip-x")) removeReminderAt(i);
+          else editReminderAt(i);
+        });
+      });
+    }
+    var txt;
+    if (!r.enabled) txt = "未开启提醒";
+    else if (list.length) txt = "已开启 · 每天 " + list.join("、") + " 提醒记账";
+    else txt = "已开启，但还没设置提醒时间";
     var s1 = $("remStatus"); if (s1) s1.textContent = txt;
+  }
+  function editReminderAt(i) {
+    var r = loadReminder();
+    var list = normRemList(r.list);
+    if (!list[i]) return;
+    openTimeSheet({
+      title: "编辑提醒时间",
+      value: list[i],
+      onConfirm: function (v) {
+        var rr = loadReminder();
+        var l = normRemList(rr.list);
+        l[i] = v;
+        rr.list = normRemList(l);
+        saveReminder(rr); renderReminderUI(); syncReminderToNative();
+      }
+    });
+  }
+  function removeReminderAt(i) {
+    var r = loadReminder();
+    var l = normRemList(r.list);
+    if (!l[i]) return;
+    var removed = l.splice(i, 1)[0];
+    r.list = l;
+    saveReminder(r); renderReminderUI(); syncReminderToNative();
+    showToast("已删除提醒 " + removed);
   }
 
   // 统一刷新入口（单向调度）
@@ -2081,10 +2278,17 @@
     var banner = $("remBanner");
     var r = loadReminder();
     if (!r.enabled) { banner.classList.remove("show"); remindedToday = false; return; }
+    var list = normRemList(r.list);
     var now = new Date();
     var cur = now.getHours() * 60 + now.getMinutes();
-    var parts = r.time.split(":");
-    var target = (+parts[0]) * 60 + (+parts[1]);
+    // 取最早的一个提醒时间作为「今日提醒阈值」；未设时间则视为 00:00
+    var target = 0;
+    if (list.length) {
+      var mins = list.map(function (t) {
+        var p = t.split(":"); return (+p[0]) * 60 + (+p[1]);
+      }).sort(function (a, b) { return a - b; });
+      target = mins[0];
+    }
     var recordedToday = (todayList || recordsOfDate(todayStr())).length > 0;
     if (cur >= target && !recordedToday && !remindedToday) {
       banner.classList.add("show");
@@ -2174,8 +2378,8 @@
       hideSuggest();
       $("fAmount").value = "";
       $("fItem").value = "";
+      // 不主动抢焦点到金额框：放弃聚焦，等用户点击对应位置再定位，避免键盘无端顶起
       showToast("已清空金额与事项");
-      var a = $("fAmount"); if (a) a.focus();
     });
     $("edToday").addEventListener("click", function () {
       var raw = $("fDate").value || nowDateTimeLocal();
@@ -2211,6 +2415,9 @@
       var t = e.target;
       var keep = t && t.closest && (t.closest("#fItem") || t.closest("#itemSuggestBox"));
       if (!keep) hideSuggest();
+      // 点设置里分类内联下拉之外的地方时收起菜单（菜单本身在 #cfgCatPick 内，不会误关）
+      var cm = $("cfgCatMenu");
+      if (cm && !cm.hidden && t && t.closest && !t.closest("#cfgCatPick")) closeCfgCatMenu();
     });
     // 下拉遮罩：点面板外任意区域（含被遮挡的下方字段）关闭下拉
     $("suggestBackdrop").addEventListener("pointerdown", function (e) { e.preventDefault(); hideSuggest(); });
@@ -2277,17 +2484,24 @@
       syncReminderToNative(); // 通知原生层调度系统提醒
     }
     $("remToggle").addEventListener("change", onRemChange);
+    // 添加提醒时间：打开滚轮选择器，确认后追加到提醒列表（去重 + 排序）
     function openRemTime() {
-      var label = $("remTimeLabel");
       openTimeSheet({
-        title: "每日提醒时间",
-        value: (label ? label.textContent : "20:00") || "20:00",
+        title: "添加提醒时间",
+        value: "20:00",
         onConfirm: function (v) {
-          var r = loadReminder(); r.time = v; saveReminder(r); renderReminderUI(); syncReminderToNative();
+          var r = loadReminder();
+          var l = normRemList(r.list);
+          if (l.indexOf(v) >= 0) { showToast("该时间已存在"); renderReminderUI(); return; }
+          l.push(v);
+          r.list = normRemList(l);
+          saveReminder(r); renderReminderUI(); syncReminderToNative();
+          showToast("已添加提醒 " + v);
         }
       });
     }
-    $("remTimeBtn").addEventListener("click", function () { openRemTime(); });
+    var remAddBtn = $("remAddBtn");
+    if (remAddBtn) remAddBtn.addEventListener("click", openRemTime);
     // 自定义时间选择器：确定/取消/遮罩关闭 + 滚动与点击选值
     // 通用选择面板
     $("pickCancel").addEventListener("click", function () { closePicker(); });
@@ -2305,7 +2519,15 @@
       col.addEventListener("click", function (e) {
         var it = e.target.closest ? e.target.closest(".ts-item") : null;
         if (!it) return;
-        Array.prototype.forEach.call(col.querySelectorAll(".ts-item"), function (x) {
+        var items = col.querySelectorAll(".ts-item");
+        var n = parseInt(col.dataset.loopN || "0", 10);
+        if (n) {
+          var idx = -1;
+          Array.prototype.forEach.call(items, function (el, i) { if (el === it) idx = i; });
+          var copy = Math.floor(idx / n);
+          if (copy !== 1) { it = items[idx + (1 - copy) * n]; }
+        }
+        Array.prototype.forEach.call(items, function (x) {
           x.classList.toggle("sel", x === it);
         });
         if (col === $("tsHour")) tsState.hour = +it.getAttribute("data-v");
@@ -2336,7 +2558,7 @@
     bindCfgCollapse();
     bindStoreCollapse();
     Array.prototype.forEach.call(document.querySelectorAll("#cfgTypeSeg button"), function (b) {
-      b.addEventListener("click", function () { cfgType = b.getAttribute("data-ctype"); renderConfigUI(); });
+      b.addEventListener("click", function () { cfgType = b.getAttribute("data-ctype"); closeCfgCatMenu(); renderConfigUI(); });
     });
     $("cfgCatAdd").addEventListener("click", function () {
       var v = $("cfgCatInput").value.trim(); if (!v) { showToast("请输入分类名"); return; }
@@ -2348,14 +2570,10 @@
       pendingJump = { type: cfgType, cat: v }; // 关闭抽屉时自动跳到新分类
       showToast("已添加分类");
     });
-    // 分类选择：点按钮弹出底部面板，选中后立刻刷新下方常用项列表
-    $("cfgItemCatBtn").addEventListener("click", function () {
-      if (!cfgCatOptions.length) { showToast("当前还没有分类，请先添加分类"); return; }
-      openPicker("选择事项所属分类", cfgCatOptions, cfgItemKey, function (key) {
-        cfgItemKey = key;
-        syncCfgCatLabel();
-        renderItemList(cfgItemKey);
-      });
+    // 分类选择：点按钮展开内联下拉（菜单与触发框同宽），选中后立刻刷新下方常用项列表
+    $("cfgItemCatBtn").addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (cfgCatMenuIsOpen()) closeCfgCatMenu(); else openCfgCatMenu();
     });
     $("cfgItemAdd").addEventListener("click", function () {
       var catKey = cfgItemKey; var v = $("cfgItemInput").value.trim();
@@ -2587,19 +2805,10 @@
     var btn = $("checkUpdBtn"); if (btn) { btn.disabled = false; btn.textContent = "检查更新"; }
     if (r.status === "latest") { setUpdHint("已是最新版本 " + (r.version || "")); setUpdNotes(""); }
     else if (r.status === "found") {
-      setUpdHint("发现新版本 " + r.version + (r.size ? "（" + fmtSize(r.size) + "）" : ""));
-      // 安卓端：公告用页面内弹窗展示，设置卡片只留一行状态，避免重复一大段正文
+      setUpdHint("发现新版本 " + r.version + (r.size ? "（" + fmtSize(r.size) + "）" : "") + "，弹窗内可安装");
+      // 安卓端：只走页面内弹窗（约定样式），绝不再往设置卡片塞第二块公告，避免重复弹窗
       if (inAndroid()) {
-        setUpdNotes('<div class="upd-head"><span class="upd-badge">v' +
-          escapeHtml(String(r.version || "").replace(/^v/i, "")) + "</span>" +
-          (r.size ? '<span class="upd-size">' + fmtSize(r.size) + "</span>" : "") +
-          '<span class="upd-size">当前 ' + escapeHtml(currentVerText()) + "</span></div>" +
-          '<div class="upd-foot"><a href="javascript:void(0)" id="updReopen">查看更新说明</a></div>');
-        var re = $("updReopen");
-        if (re) re.addEventListener("click", function (e) {
-          e.preventDefault();
-          openUpdateModal({ version: r.version, size: r.size, notes: r.notes || "" });
-        });
+        setUpdNotes("");
         openUpdateModal({ version: r.version, size: r.size, notes: r.notes || "" });
       } else {
         setUpdNotes(notesCardHTML({ version: r.version, size: r.size, body: r.notes || "" }));
@@ -2720,7 +2929,9 @@
       pendingJump = null;
       saveLastSel(); // 记住跳转后的分类，刷新后仍停在这里
     }
-    $("drawerMask").classList.remove("show"); $("drawer").classList.remove("show"); renderEntry();
+    $("drawerMask").classList.remove("show"); $("drawer").classList.remove("show");
+    closeCfgCatMenu(); // 收起分类内联下拉，避免再次打开抽屉时残留
+    renderEntry();
   }
 
   // ===== 记一笔：独立全屏输入页（平时收起）=====
@@ -2730,14 +2941,17 @@
   function openAddPage() {
     hideSuggest();
     var page = $("pageAdd"); if (!page) return;
+    // 时间沿用（issue #6）：若上一次记一笔选过时间，则默认带出该时间；
+    // 否则用「此刻」。日期默认今天（记一笔通常是记当天的账）。
+    var initTime = state.lastEntryTime || nowTime();
+    $("fDate").value = todayStr() + "T" + initTime;
+    syncEntryDateUI();
     page.classList.add("show");
     page.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden"; // 锁住背景滚动
     renderEntry();
-    syncEntryDateUI(); // 打开时把顶部日期选择器同步到 fDate 当前值
     setAddPageFlag(true);
-    // 稍等页面入场动画再聚焦，避免键盘顶起时和动画抢帧造成抖动
-    setTimeout(function () { var a = $("fAmount"); if (a) a.focus(); }, 200);
+    // 不主动抢焦点到金额框（issue #5）：放弃聚焦，等用户点击字段再定位，避免键盘无端顶起
   }
   function closeAddPage() {
     var page = $("pageAdd"); if (!page) return;
@@ -2746,6 +2960,8 @@
     page.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
     setAddPageFlag(false);
+    state.editId = null;            // 取消/收起时退出编辑态，下次打开是「记一笔」
+    setEntryEditMode(false);
     refreshAll();
   }
   function addPageIsOpen() {
@@ -2819,6 +3035,7 @@
           '<div class="rec-main"><div class="it">' + escapeHtml(r.item || (isInc ? "收入" : "支出")) + "</div>" +
           '<div class="mt">' + escapeHtml(r.category || "") + " · " + escapeHtml(r.time || "") + "</div></div>" +
           '<div class="rec-amt ' + (isInc ? "inc" : "exp") + '">' + (isInc ? "+" : "-") + fmtMoney(r.amount) + "</div>" +
+          '<button class="rec-edit" data-edit="' + r.id + '" title="编辑" aria-label="编辑">✎</button>' +
           '<button class="rec-del" data-del="' + r.id + '" title="删除">×</button>' +
           "</div>";
       });
@@ -2829,6 +3046,9 @@
     box.innerHTML = html;
     Array.prototype.forEach.call(box.querySelectorAll("[data-del]"), function (btn) {
       btn.addEventListener("click", function () { deleteRecord(btn.getAttribute("data-del")); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll("[data-edit]"), function (btn) {
+      btn.addEventListener("click", function () { editRecord(btn.getAttribute("data-edit")); });
     });
   }
   function buildRecordsTable(show) {
@@ -2841,7 +3061,7 @@
         '<td><span class="rec-tag" style="background:' + meta.color + '22;color:' + meta.color + '">' + meta.icon + " " + escapeHtml(r.category || "") + "</span></td>" +
         '<td class="c-item">' + escapeHtml(r.item || (isInc ? "收入" : "支出")) + "</td>" +
         '<td class="c-amt ' + (isInc ? "inc" : "exp") + '">' + (isInc ? "+" : "-") + fmtMoney(r.amount) + "</td>" +
-        '<td class="c-del"><button class="rec-del" data-del="' + r.id + '" title="删除">×</button></td>' +
+        '<td class="c-del"><button class="rec-edit" data-edit="' + r.id + '" title="编辑">✎</button><button class="rec-del" data-del="' + r.id + '" title="删除">×</button></td>' +
         "</tr>";
     }).join("");
     return '<div class="rec-table-wrap"><table class="rec-table"><thead><tr>' +
@@ -2862,7 +3082,36 @@
     saveRecords(); refreshAll(); showToast("已删除");
   }
 
+  // 切换「记一笔 / 编辑记录」标题与按钮文案（编辑模式下保存会变成更新）
+  function setEntryEditMode(isEdit) {
+    var t = $("addTitle"), b = $("addBtn");
+    if (t) t.textContent = isEdit ? "编辑记录" : "记一笔";
+    if (b) b.textContent = isEdit ? "保存修改" : "保存这笔记录";
+  }
+  // 从明细列表点「编辑」：把该记录回填到输入页（时间以记录本身为准，覆盖打开时默认的「此刻」）
+  function editRecord(id) {
+    var rec = state.records.filter(function (r) { return r.id === id; })[0];
+    if (!rec) return;
+    state.editId = id;
+    state.curType = rec.type === "income" ? "income" : "expense";
+    state.curCat = rec.category || (rec.type === "income" ? "工资" : "餐饮");
+    var expBtn = $("typeExp"), incBtn = $("typeInc");
+    if (rec.type === "income") { incBtn.classList.add("active", "inc"); expBtn.classList.remove("active", "exp"); }
+    else { expBtn.classList.add("active", "exp"); incBtn.classList.remove("active", "inc"); }
+    openAddPage(); // 会先把时间重置为「此刻」
+    // 用记录的真实时间覆盖默认值
+    $("fDate").value = (rec.date || todayStr()) + "T" + (rec.time || "00:00:00");
+    syncEntryDateUI();
+    $("fAmount").value = rec.amount;
+    $("fItem").value = rec.item || "";
+    renderEntry();
+    setEntryEditMode(true);
+    setAddPageFlag(true);
+    showToast("正在编辑这条记录");
+  }
+
   function onAdd() {
+    var wasEdit = !!state.editId;
     var amt = parseFloat($("fAmount").value);
     if (!amt || amt <= 0) { showToast("请输入有效金额"); $("fAmount").focus(); return; }
     var item = $("fItem").value.trim() || (state.curType === "income" ? "收入" : "支出");
@@ -2875,14 +3124,29 @@
     } else {
       datePart = todayStr(); timePart = nowTime();
     }
-    var rec = { id: uid(), type: state.curType, category: state.curCat, amount: Math.round(amt * 100) / 100, item: item, date: datePart, time: timePart, createdAt: Date.now() };
-    addRecord(rec);
+    var rec = { id: state.editId || uid(), type: state.curType, category: state.curCat, amount: Math.round(amt * 100) / 100, item: item, date: datePart, time: timePart, createdAt: Date.now() };
+    // 时间沿用（issue #6）：把本次选择的时间记下来，下次打开记一笔页默认带出，未改即沿用
+    state.lastEntryTime = timePart;
+    if (state.editId) {
+      // 更新已有记录：保留原 id 与 createdAt
+      var old = null, idx = -1;
+      for (var i = 0; i < state.records.length; i++) {
+        if (state.records[i].id === state.editId) { old = state.records[i]; idx = i; break; }
+      }
+      if (old) rec.createdAt = old.createdAt;
+      if (idx >= 0) state.records[idx] = rec; else state.records.push(rec);
+    } else {
+      addRecord(rec);
+    }
+    saveRecords();
     $("fAmount").value = ""; $("fItem").value = "";
-    // 不自动重置时间：保留用户上一次设置的值，便于连续记同一时间的账；"当前时间"仅由「现在」按钮设置
+    // 时间已存进 state.lastEntryTime，下次打开记一笔页会默认带出并沿用
+    state.editId = null;
+    setEntryEditMode(false);
     remindedToday = false;
     // 保存后自动收起输入页，回到记录明细
     closeAddPage();
-    showToast("已保存 · " + (state.curType === "income" ? "收入" : "支出") + " " + fmtMoney(rec.amount));
+    showToast((wasEdit ? "已更新 · " : "已保存 · ") + (rec.type === "income" ? "收入" : "支出") + " " + fmtMoney(rec.amount));
   }
 
   function toggleTheme() {
@@ -3010,7 +3274,8 @@
     var data = { records: state.records, reminder: loadReminder(), exportedAt: new Date().toISOString(), app: "黑猫记账" };
     downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "黑猫记账备份_" + todayStr() + ".json");
     markExported();
-    showToast("已导出到 Download 文件夹");
+    // 安卓端原生 saveFile 已弹系统提示，避免与原生 Toast 重复叠显，这里只在网页版提示
+    if (!inAndroid()) showToast("已导出到 Download 文件夹");
   }
   // 导出 CSV（Excel/WPS 可直接打开，也方便用手机文件管理器查看）
   function exportCSV() {
@@ -3029,7 +3294,7 @@
     }).join("\r\n");
     downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "黑猫记账明细_" + todayStr() + ".csv");
     markExported();
-    showToast("已导出 CSV 到 Download 文件夹");
+    if (!inAndroid()) showToast("已导出 CSV 到 Download 文件夹");
   }
   // 数据与存储的只读信息
   function renderStoreInfo() {
