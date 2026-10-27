@@ -689,17 +689,42 @@
   .rec-view-toggle button { border: none; background: transparent; color: var(--text-soft); font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease); }
   .rec-view-toggle button.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
   .rec-table-wrap { overflow-x: auto; margin-top: 4px; -webkit-overflow-scrolling: touch; }
-  .rec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .rec-table th { text-align: left; color: var(--text-soft); font-weight: 600; font-size: 11px; padding: 8px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  .rec-table td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  /* 固定列宽 + min-width：列宽不再被挤压换行，横向不够时整表可横向滚动 */
+  .rec-table { width: 100%; min-width: 410px; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+  .rec-table th { text-align: left; color: var(--text-soft); font-weight: 600; font-size: 11px; padding: 7px 5px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .rec-table td { padding: 9px 5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   .rec-table tr:last-child td { border-bottom: none; }
   .rec-table .amt, .rec-table th.amt { text-align: right; }
-  .rec-table .c-amt { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* 日期强制单行：不换行 + 等宽数字，避免宽度抖动导致折行 */
+  .rec-table .c-date { width: 80px; font-size: 12px; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rec-table .c-time { width: 44px; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rec-table .c-cat { width: 66px; overflow: hidden; }
+  /* 事项列收窄，过长省略号截断，点击弹浮窗看完整信息 */
+  .rec-table .c-item { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .rec-table .c-amt { width: 80px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rec-table .c-amt.exp { color: var(--expense); }
   .rec-table .c-amt.inc { color: var(--income); }
-  .rec-table .c-time { color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .rec-table .c-item { max-width: 42vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rec-table .c-del { text-align: center; width: 32px; }
+  .rec-table .c-del { text-align: center; width: 62px; white-space: nowrap; }
+
+  /* 明细表格：点击事项弹出的完整信息浮窗 */
+  .rec-pop {
+    position: fixed; z-index: 70; display: none;
+    width: min(258px, 78vw); padding: 12px 14px 14px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); box-shadow: 0 12px 34px rgba(0,0,0,.18), var(--shadow);
+  }
+  .rec-pop.show { display: block; animation: recPopIn .18s var(--ease); }
+  @keyframes recPopIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .rec-pop-hd { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .rec-pop-hd b { flex: 1; font-size: 14px; line-height: 1.35; word-break: break-word; }
+  .rec-pop-x { flex: none; border: none; background: transparent; color: var(--text-soft); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; }
+  .rec-pop-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; padding: 3px 0; color: var(--text-soft); }
+  .rec-pop-row b { color: var(--text); font-weight: 600; }
+  .rec-pop-row b.inc { color: var(--income); }
+  .rec-pop-row b.exp { color: var(--expense); }
+  .rec-pop-actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .rec-pop-actions button { flex: 1; padding: 8px 6px; border-radius: 9px; border: 1px solid var(--line); background: var(--card-soft); color: var(--text); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .rec-pop-actions button.danger { color: var(--expense); border-color: rgba(239,68,68,.35); }
   .rec-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 
   /* 统计 */
@@ -793,22 +818,10 @@
 
   .section-hidden { display: none !important; }
 
-  /* 设置：顶部标题栏正下方轻下拉面板（取代原先从右侧滑出的整屏抽屉） */
-  .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.16); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 50; }
-  .drawer-mask.show { opacity: 1; pointer-events: auto; }
-  .drawer {
-    position: fixed; left: 0; right: 0; top: 0;            /* top 由 JS 设为顶栏底部，落点正好在标题图片下方 */
-    width: auto; max-width: 600px; margin: 0 auto;
-    max-height: calc(100vh - 24px);
-    background: var(--card); z-index: 51;
-    transform: translateY(-18px); opacity: 0; pointer-events: none;
-    transition: transform .3s var(--ease), opacity .3s var(--ease);
-    padding: 16px 18px 22px; overflow-y: auto;
-    border-radius: 0 0 18px 18px;
-    box-shadow: 0 16px 44px rgba(0,0,0,.14), var(--shadow);
-  }
-  .drawer.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  /* 设置：已整合进主页面，作为普通版块呈现（与明细等一致），不再是浮层/抽屉 */
+  .drawer { position: relative; }                            /* 供内部 .close-x 绝对定位 */
   .drawer h3 { font-size: 16px; margin-bottom: 16px; }
+  .drawer > .close-x { top: 14px; right: 14px; }
   .drawer .card { margin-bottom: 14px; box-shadow: none; border: 1px solid var(--line); }
   .backup-btn { display: block; width: 100%; text-align: center; padding: 12px; margin-top: 8px; border: 1.5px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--text); font-size: 14px; cursor: pointer; transition: all .2s; }
   /* 数据与存储：位置说明 */
@@ -1009,6 +1022,103 @@
     </div>
     <div class="rem-status" id="remStatus"></div>
   </section>
+<!-- 设置：整合在主页面内的一个版块（和明细等一致，不再是浮层/抽屉） -->
+<section class="card section-hidden drawer" id="drawer">
+  <button class="close-x" id="drawerClose">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <h3>设置与数据</h3>
+  <!-- 分类与事项配置：默认收起，点「编辑」才展开，避免一进设置就看到一大片编辑项 -->
+  <div class="card cfg-card" id="cfgCard">
+    <div class="card-title cfg-title" id="cfgTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="cfgBody">
+      分类与事项配置
+      <span class="cfg-sum" id="cfgSum"></span>
+      <button type="button" class="cfg-toggle" id="cfgToggle">编辑</button>
+    </div>
+    <div class="cfg-body" id="cfgBody" hidden>
+      <div class="cfg-sub">分类（支出 / 收入可分别设置）</div>
+      <div class="cfg-seg" id="cfgTypeSeg">
+        <button type="button" data-ctype="expense" class="active">支出</button>
+        <button type="button" data-ctype="income">收入</button>
+      </div>
+      <div class="cfg-list" id="cfgCatList"></div>
+      <div class="cfg-add">
+        <input type="text" id="cfgCatInput" placeholder="新增分类名" maxlength="8">
+        <button type="button" class="mini-btn" id="cfgCatAdd">添加</button>
+      </div>
+      <div class="cfg-sub">事项常用项（按分类设置下拉建议）</div>
+      <!-- 分类事项下拉：内联下拉，菜单宽度与触发框完全一致 -->
+      <div class="cfg-cat-pick" id="cfgCatPick">
+        <button type="button" class="cfg-sel cfg-pickbtn" id="cfgItemCatBtn" aria-haspopup="listbox" aria-expanded="false">
+          <span class="pick-cur" id="cfgItemCatLabel">选择分类</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="cfg-cat-menu" id="cfgCatMenu" role="listbox" hidden></div>
+      </div>
+      <div class="cfg-list" id="cfgItemList"></div>
+      <div class="cfg-add">
+        <input type="text" id="cfgItemInput" placeholder="新增常用事项" maxlength="20">
+        <button type="button" class="mini-btn" id="cfgItemAdd">添加</button>
+      </div>
+    </div>
+  </div>
+  <!-- 数据与存储：同样默认收起，点「展开」才显示备份/导入等操作 -->
+  <div class="card cfg-card" id="storeCard">
+    <div class="card-title cfg-title" id="storeTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="storeBody">
+      数据与存储
+      <span class="cfg-sum" id="storeSum"></span>
+      <button type="button" class="cfg-toggle" id="storeToggle">展开</button>
+    </div>
+    <div class="cfg-body" id="storeBody" hidden>
+      <div class="store-box">
+        <div class="store-row">
+          <span class="k">日常数据</span>
+          <span class="v">存于本机 App 私有空间，不上传服务器</span>
+        </div>
+        <div class="store-row">
+          <span class="k">备份位置</span>
+          <span class="v" id="storePath">内部存储 / Download / 黑猫记账备份_日期.json</span>
+        </div>
+        <div class="store-row">
+          <span class="k">当前记录</span>
+          <span class="v" id="storeCount">—</span>
+        </div>
+        <div class="store-row">
+          <span class="k">上次备份</span>
+          <span class="v" id="storeLast">从未备份</span>
+        </div>
+      </div>
+      <button class="backup-btn" id="exportBtn">导出 JSON 备份到 Download</button>
+      <button class="backup-btn" id="exportCsvBtn">导出 CSV（Excel 可打开）</button>
+      <button class="backup-btn" id="importBtn">导入恢复（选手机里的备份文件）</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+      <button class="backup-btn danger" id="clearSampleBtn" style="margin-top:14px;">清空示例数据</button>
+      <button class="backup-btn danger" id="clearAllBtn">清空全部数据</button>
+      <p class="store-tip" id="storeTip">红米 K70 Pro：打开「文件管理 → 手机 → Download」即可看到备份文件。</p>
+    </div>
+  </div>
+  <div class="card" id="installCard" style="display:none;">
+    <div class="card-title">装到手机桌面</div>
+    <p class="store-tip" style="margin-bottom:8px;">
+      在手机浏览器打开本页 → 右上角菜单 → 选「安装应用」或「添加到主屏幕」，
+      之后就能像 App 一样全屏使用，桌面会有独立图标。
+    </p>
+    <button class="backup-btn" id="installDoneBtn">知道了，不再提示</button>
+  </div>
+  <!-- 应用更新：放在设置最底部（不常用，避免一进设置就占首屏） -->
+  <div class="card">
+    <div class="card-title">应用更新</div>
+    <div class="upd-row">
+      <div class="upd-meta">
+        <div class="upd-ver">当前版本 <b id="appVer">—</b></div>
+        <div class="upd-hint" id="updHint">检查 GitHub Releases 获取最新版本</div>
+      </div>
+      <button type="button" class="mini-btn" id="checkUpdBtn">检查更新</button>
+    </div>
+    <div class="upd-notes" id="updNotes" hidden></div>
+  </div>
+</section>
+
 </div>
 
 <!-- 移动端底部 Tab -->
@@ -1167,105 +1277,9 @@
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
-<!-- 设置抽屉 -->
-<div class="drawer-mask" id="drawerMask"></div>
-<aside class="drawer" id="drawer">
-  <button class="close-x" id="drawerClose">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-  </button>
-  <h3>设置与数据</h3>
-  <!-- 分类与事项配置：默认收起，点「编辑」才展开，避免一进设置就看到一大片编辑项 -->
-  <div class="card cfg-card" id="cfgCard">
-    <div class="card-title cfg-title" id="cfgTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="cfgBody">
-      分类与事项配置
-      <span class="cfg-sum" id="cfgSum"></span>
-      <button type="button" class="cfg-toggle" id="cfgToggle">编辑</button>
-    </div>
-    <div class="cfg-body" id="cfgBody" hidden>
-      <div class="cfg-sub">分类（支出 / 收入可分别设置）</div>
-      <div class="cfg-seg" id="cfgTypeSeg">
-        <button type="button" data-ctype="expense" class="active">支出</button>
-        <button type="button" data-ctype="income">收入</button>
-      </div>
-      <div class="cfg-list" id="cfgCatList"></div>
-      <div class="cfg-add">
-        <input type="text" id="cfgCatInput" placeholder="新增分类名" maxlength="8">
-        <button type="button" class="mini-btn" id="cfgCatAdd">添加</button>
-      </div>
-      <div class="cfg-sub">事项常用项（按分类设置下拉建议）</div>
-      <!-- 分类事项下拉：内联下拉，菜单宽度与触发框完全一致 -->
-      <div class="cfg-cat-pick" id="cfgCatPick">
-        <button type="button" class="cfg-sel cfg-pickbtn" id="cfgItemCatBtn" aria-haspopup="listbox" aria-expanded="false">
-          <span class="pick-cur" id="cfgItemCatLabel">选择分类</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <div class="cfg-cat-menu" id="cfgCatMenu" role="listbox" hidden></div>
-      </div>
-      <div class="cfg-list" id="cfgItemList"></div>
-      <div class="cfg-add">
-        <input type="text" id="cfgItemInput" placeholder="新增常用事项" maxlength="20">
-        <button type="button" class="mini-btn" id="cfgItemAdd">添加</button>
-      </div>
-    </div>
-  </div>
-  <!-- 数据与存储：同样默认收起，点「展开」才显示备份/导入等操作 -->
-  <div class="card cfg-card" id="storeCard">
-    <div class="card-title cfg-title" id="storeTitle" role="button" tabindex="0" aria-expanded="false" aria-controls="storeBody">
-      数据与存储
-      <span class="cfg-sum" id="storeSum"></span>
-      <button type="button" class="cfg-toggle" id="storeToggle">展开</button>
-    </div>
-    <div class="cfg-body" id="storeBody" hidden>
-      <div class="store-box">
-        <div class="store-row">
-          <span class="k">日常数据</span>
-          <span class="v">存于本机 App 私有空间，不上传服务器</span>
-        </div>
-        <div class="store-row">
-          <span class="k">备份位置</span>
-          <span class="v" id="storePath">内部存储 / Download / 黑猫记账备份_日期.json</span>
-        </div>
-        <div class="store-row">
-          <span class="k">当前记录</span>
-          <span class="v" id="storeCount">—</span>
-        </div>
-        <div class="store-row">
-          <span class="k">上次备份</span>
-          <span class="v" id="storeLast">从未备份</span>
-        </div>
-      </div>
-      <button class="backup-btn" id="exportBtn">导出 JSON 备份到 Download</button>
-      <button class="backup-btn" id="exportCsvBtn">导出 CSV（Excel 可打开）</button>
-      <button class="backup-btn" id="importBtn">导入恢复（选手机里的备份文件）</button>
-      <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
-      <button class="backup-btn danger" id="clearSampleBtn" style="margin-top:14px;">清空示例数据</button>
-      <button class="backup-btn danger" id="clearAllBtn">清空全部数据</button>
-      <p class="store-tip" id="storeTip">红米 K70 Pro：打开「文件管理 → 手机 → Download」即可看到备份文件。</p>
-    </div>
-  </div>
-  <div class="card" id="installCard" style="display:none;">
-    <div class="card-title">装到手机桌面</div>
-    <p class="store-tip" style="margin-bottom:8px;">
-      在手机浏览器打开本页 → 右上角菜单 → 选「安装应用」或「添加到主屏幕」，
-      之后就能像 App 一样全屏使用，桌面会有独立图标。
-    </p>
-    <button class="backup-btn" id="installDoneBtn">知道了，不再提示</button>
-  </div>
-  <!-- 应用更新：放在设置最底部（不常用，避免一进设置就占首屏） -->
-  <div class="card">
-    <div class="card-title">应用更新</div>
-    <div class="upd-row">
-      <div class="upd-meta">
-        <div class="upd-ver">当前版本 <b id="appVer">—</b></div>
-        <div class="upd-hint" id="updHint">检查 GitHub Releases 获取最新版本</div>
-      </div>
-      <button type="button" class="mini-btn" id="checkUpdBtn">检查更新</button>
-    </div>
-    <div class="upd-notes" id="updNotes" hidden></div>
-  </div>
-</aside>
-
 <div class="toast" id="toast"></div>
+<!-- 明细表格：点击事项时弹出的完整信息浮窗 -->
+<div class="rec-pop" id="recPop" role="dialog" aria-label="记录详情"></div>
 
 <script>
 "use strict";
@@ -1372,6 +1386,10 @@
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" +
       pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
   }
+  // ===== 设置视图（已整合进主页面，作为一个普通版块）=====
+  var settingsOpen = false;
+  var lastTab = "entry";   // 进入设置前所在的 tab，退出时回到这里
+
   // ===== 记一笔：顶部日期选择器（fDate 为隐藏的真实值，UI 与之双向同步）=====
   var WEEK_CN = ["日", "一", "二", "三", "四", "五", "六"];
   function syncEntryDateUI() {
@@ -2428,6 +2446,12 @@
       // 点设置里分类内联下拉之外的地方时收起菜单（菜单本身在 #cfgCatPick 内，不会误关）
       var cm = $("cfgCatMenu");
       if (cm && !cm.hidden && t && t.closest && !t.closest("#cfgCatPick")) closeCfgCatMenu();
+      // 点浮窗和事项单元格之外的地方时收起记录详情浮窗
+      var pop = $("recPop");
+      if (pop && pop.classList.contains("show")) {
+        var inPop = t && t.closest && (t.closest("#recPop") || t.closest("[data-rec]"));
+        if (!inPop) hideRecPop();
+      }
     });
     // 下拉遮罩：点面板外任意区域（含被遮挡的下方字段）关闭下拉
     $("suggestBackdrop").addEventListener("pointerdown", function (e) { e.preventDefault(); hideSuggest(); });
@@ -2596,21 +2620,25 @@
     });
     $("settingsBtn").addEventListener("click", function () {
       var d = $("drawer");
-      // 让面板顶部对齐顶栏底部，落点正好在「标题图片」下方区域
-      var tb = document.querySelector(".topbar");
-      var top = tb ? Math.ceil(tb.getBoundingClientRect().bottom) : 0;
-      d.style.top = top + "px";
-      d.style.maxHeight = Math.max(160, window.innerHeight - top - 12) + "px";
-      if (d.classList.contains("show")) { closeDrawer(); }
+      if (!d) return;
+      hideRecPop(); // 进入设置前先收起记录详情浮窗
+      if (settingsOpen) { closeDrawer(); }
       else {
-        // 保留一层「极浅」遮罩：既能点空白处关闭，又不会像原先那样整屏压暗显得突兀
-        $("drawerMask").classList.add("show");
-        d.classList.add("show"); d.scrollTop = 0;
+        // 进入设置视图：设置作为主页面里的一个版块出现，同时隐藏「今日统计」（todayCard）
+        var act = document.querySelector("#tabbar button.active");
+        if (act) lastTab = act.getAttribute("data-tab") || "entry";
+        settingsOpen = true;
+        Array.prototype.forEach.call(document.querySelectorAll(".wrap > section"), function (s) {
+          s.classList.add("section-hidden");
+        });
+        d.classList.remove("section-hidden");
+        d.classList.add("show");
+        Array.prototype.forEach.call(document.querySelectorAll("#tabbar button"), function (b) { b.classList.remove("active"); });
         renderConfigUI(); renderStoreInfo(); renderInstallHint();
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     });
     $("drawerClose").addEventListener("click", closeDrawer);
-    $("drawerMask").addEventListener("click", closeDrawer);
     // 备份
     $("exportBtn").addEventListener("click", exportJSON);
     $("exportCsvBtn").addEventListener("click", exportCSV);
@@ -2950,8 +2978,11 @@
       pendingJump = null;
       saveLastSel(); // 记住跳转后的分类，刷新后仍停在这里
     }
-    $("drawerMask").classList.remove("show"); $("drawer").classList.remove("show");
-    closeCfgCatMenu(); // 收起分类内联下拉，避免再次打开抽屉时残留
+    settingsOpen = false;
+    var d = $("drawer");
+    if (d) { d.classList.remove("show"); d.classList.add("section-hidden"); }
+    closeCfgCatMenu(); // 收起分类内联下拉，避免再次打开设置时残留
+    switchTab(lastTab || "entry"); // 退出设置视图，回到进入前所在的 tab
     renderEntry();
   }
 
@@ -3071,22 +3102,65 @@
     Array.prototype.forEach.call(box.querySelectorAll("[data-edit]"), function (btn) {
       btn.addEventListener("click", function () { editRecord(btn.getAttribute("data-edit")); });
     });
+    // 事项被截断时，点击单元格弹浮窗显示完整信息
+    Array.prototype.forEach.call(box.querySelectorAll("[data-rec]"), function (cell) {
+      cell.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var rec = state.records.filter(function (x) { return x.id === cell.getAttribute("data-rec"); })[0];
+        if (rec) showRecPop(rec, cell);
+      });
+    });
+  }
+  function showRecPop(r, anchor) {
+    var pop = $("recPop"); if (!pop) return;
+    var meta = catMeta(r.type === "income" ? "income" : "expense", r.category);
+    var isInc = r.type === "income";
+    var rows = [
+      ["金额", '<b class="' + (isInc ? "inc" : "exp") + '">' + (isInc ? "+" : "-") + fmtMoney(r.amount) + "</b>"],
+      ["分类", "<b>" + meta.icon + " " + escapeHtml(r.category || "") + "</b>"],
+      ["日期", "<b>" + escapeHtml(r.date || "") + "</b>"],
+      ["时间", "<b>" + escapeHtml((r.time || "").slice(0, 8)) + "</b>"],
+      ["类型", "<b>" + (isInc ? "收入" : "支出") + "</b>"]
+    ].map(function (x) { return '<div class="rec-pop-row"><span>' + x[0] + "</span>" + x[1] + "</div>"; }).join("");
+    pop.innerHTML =
+      '<div class="rec-pop-hd"><b>' + escapeHtml(r.item || (isInc ? "收入" : "支出")) + "</b>" +
+      '<button type="button" class="rec-pop-x" id="recPopX" aria-label="关闭">✕</button></div>' + rows +
+      '<div class="rec-pop-actions"><button type="button" id="recPopEdit">编辑</button>' +
+      '<button type="button" class="danger" id="recPopDel">删除</button></div>';
+    pop.classList.add("show");
+    // 定位到单元格下方；空间不够则翻到上方，并限制在视口内
+    var rect = anchor.getBoundingClientRect();
+    var pw = pop.offsetWidth, ph = pop.offsetHeight;
+    var left = rect.left;
+    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+    if (left < 10) left = 10;
+    var top = rect.bottom + 6;
+    if (top + ph > window.innerHeight - 10) top = Math.max(10, rect.top - ph - 6);
+    pop.style.left = left + "px";
+    pop.style.top = top + "px";
+    var x = $("recPopX"); if (x) x.onclick = function () { hideRecPop(); };
+    var eb = $("recPopEdit"); if (eb) eb.onclick = function () { hideRecPop(); editRecord(r.id); };
+    var db = $("recPopDel"); if (db) db.onclick = function () { hideRecPop(); deleteRecord(r.id); };
+  }
+  function hideRecPop() {
+    var pop = $("recPop"); if (pop) pop.classList.remove("show");
   }
   function buildRecordsTable(show) {
     var rows = show.map(function (r) {
       var meta = catMeta(r.type === "income" ? "income" : "expense", r.category);
       var isInc = r.type === "income";
       return '<tr>' +
-        '<td class="c-date">' + r.date + "</td>" +
+        '<td class="c-date">' + escapeHtml(r.date || "") + "</td>" +
         '<td class="c-time">' + escapeHtml((r.time || "").slice(0, 5)) + "</td>" +
-        '<td><span class="rec-tag" style="background:' + meta.color + '22;color:' + meta.color + '">' + meta.icon + " " + escapeHtml(r.category || "") + "</span></td>" +
-        '<td class="c-item">' + escapeHtml(r.item || (isInc ? "收入" : "支出")) + "</td>" +
+        '<td class="c-cat"><span class="rec-tag" style="background:' + meta.color + '22;color:' + meta.color + '">' + meta.icon + " " + escapeHtml(r.category || "") + "</span></td>" +
+        '<td class="c-item" data-rec="' + r.id + '" role="button" tabindex="0" title="点击查看完整信息">' + escapeHtml(r.item || (isInc ? "收入" : "支出")) + "</td>" +
         '<td class="c-amt ' + (isInc ? "inc" : "exp") + '">' + (isInc ? "+" : "-") + fmtMoney(r.amount) + "</td>" +
         '<td class="c-del"><button class="rec-edit" data-edit="' + r.id + '" title="编辑">✎</button><button class="rec-del" data-del="' + r.id + '" title="删除">×</button></td>' +
         "</tr>";
     }).join("");
     return '<div class="rec-table-wrap"><table class="rec-table"><thead><tr>' +
-      "<th>日期</th><th>时间</th><th>分类</th><th>事项</th><th class=\"amt\">金额</th><th></th>" +
+      "<th class=\"c-date\">日期</th><th class=\"c-time\">时间</th><th class=\"c-cat\">分类</th>" +
+      "<th class=\"c-item\">事项</th><th class=\"c-amt amt\">金额</th><th class=\"c-del\"></th>" +
       '</tr></thead><tbody>' + rows + "</tbody></table></div>";
   }
   function syncRecViewUI() {
@@ -3244,6 +3318,8 @@
   }
 
   function switchTab(tab) {
+    settingsOpen = false; // 切到其它 tab 即视为退出设置视图
+    hideRecPop();         // 切换版块时收起记录详情浮窗
     Array.prototype.forEach.call(document.querySelectorAll("#tabbar button"), function (b) { b.classList.remove("active"); });
     var map = { entry: "sec-entry", stats: "sec-stats", summary: "sec-summary", reminder: "sec-reminder" };
     var showIds = tab === "entry" ? ["sec-entry"] :
