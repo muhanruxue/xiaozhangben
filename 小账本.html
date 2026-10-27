@@ -793,11 +793,21 @@
 
   .section-hidden { display: none !important; }
 
-  /* 抽屉式设置 */
-  .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 50; }
+  /* 设置：顶部标题栏正下方轻下拉面板（取代原先从右侧滑出的整屏抽屉） */
+  .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.16); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 50; }
   .drawer-mask.show { opacity: 1; pointer-events: auto; }
-  .drawer { position: fixed; right: 0; top: 0; bottom: 0; width: min(360px, 88vw); background: var(--bg); z-index: 51; transform: translateX(100%); transition: transform .35s var(--ease); padding: 22px; overflow-y: auto; }
-  .drawer.show { transform: none; }
+  .drawer {
+    position: fixed; left: 0; right: 0; top: 0;            /* top 由 JS 设为顶栏底部，落点正好在标题图片下方 */
+    width: auto; max-width: 600px; margin: 0 auto;
+    max-height: calc(100vh - 24px);
+    background: var(--card); z-index: 51;
+    transform: translateY(-18px); opacity: 0; pointer-events: none;
+    transition: transform .3s var(--ease), opacity .3s var(--ease);
+    padding: 16px 18px 22px; overflow-y: auto;
+    border-radius: 0 0 18px 18px;
+    box-shadow: 0 16px 44px rgba(0,0,0,.14), var(--shadow);
+  }
+  .drawer.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
   .drawer h3 { font-size: 16px; margin-bottom: 16px; }
   .drawer .card { margin-bottom: 14px; box-shadow: none; border: 1px solid var(--line); }
   .backup-btn { display: block; width: 100%; text-align: center; padding: 12px; margin-top: 8px; border: 1.5px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--text); font-size: 14px; cursor: pointer; transition: all .2s; }
@@ -2585,8 +2595,19 @@
       showToast("已添加事项");
     });
     $("settingsBtn").addEventListener("click", function () {
-      $("drawerMask").classList.add("show"); $("drawer").classList.add("show");
-      renderConfigUI(); renderStoreInfo(); renderInstallHint();
+      var d = $("drawer");
+      // 让面板顶部对齐顶栏底部，落点正好在「标题图片」下方区域
+      var tb = document.querySelector(".topbar");
+      var top = tb ? Math.ceil(tb.getBoundingClientRect().bottom) : 0;
+      d.style.top = top + "px";
+      d.style.maxHeight = Math.max(160, window.innerHeight - top - 12) + "px";
+      if (d.classList.contains("show")) { closeDrawer(); }
+      else {
+        // 保留一层「极浅」遮罩：既能点空白处关闭，又不会像原先那样整屏压暗显得突兀
+        $("drawerMask").classList.add("show");
+        d.classList.add("show"); d.scrollTop = 0;
+        renderConfigUI(); renderStoreInfo(); renderInstallHint();
+      }
     });
     $("drawerClose").addEventListener("click", closeDrawer);
     $("drawerMask").addEventListener("click", closeDrawer);
