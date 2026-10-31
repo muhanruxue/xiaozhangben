@@ -8,6 +8,8 @@ android/build-*/
 android/assets/
 android/res/mipmap-*/
 *.apk
+# apksigner 生成的签名附属文件
+*.idsig
 
 # Python
 __pycache__/
@@ -16,6 +18,8 @@ __pycache__/
 # 工作区元数据
 .workbuddy/
 .DS_Store
+# WorkBuddy 应用卡元数据，含本机绝对路径
+*.genie
 
 # 图标渲染临时页
 .iconsrc/
